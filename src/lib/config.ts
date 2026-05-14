@@ -5,9 +5,9 @@
 
 import { Platform } from "react-native";
 
-const KEY_API_KEY = "anthropic_api_key";
-const KEY_BASE_URL = "anthropic_base_url";
-const KEY_MODEL = "anthropic_model";
+const KEY_API_KEY = "llm_api_key";
+const KEY_BASE_URL = "llm_base_url";
+const KEY_MODEL = "llm_model";
 const KEY_AMAP_KEY = "amap_api_key";
 
 const DEFAULT_MODEL = "glm-4-flash";

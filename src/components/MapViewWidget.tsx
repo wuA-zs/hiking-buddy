@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Spacing, FontSize, Radius, Shadows } from "../lib/theme";
-import { getCurrentPosition, startWatching, stopWatching, type Position } from "../services/location";
+import { useTheme, Spacing, FontSize, Radius, Shadows } from "../lib/theme";
+import { requestPermission, getCurrentPosition, startWatching, stopWatching, type Position } from "../services/location";
 import { reverseGeocode, searchNearby, type POI, type Address } from "../services/maps";
 import { MapViewNative } from "./MapViewNative";
 
@@ -14,11 +14,13 @@ interface Props {
 const isWeb = Platform.OS === "web";
 
 export function MapViewWidget({ onLocationTap, onPOITap }: Props) {
+  const { colors: Colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
   const [address, setAddress] = useState<Address | null>(null);
   const [pois, setPois] = useState<POI[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const expandAnim = useState(new Animated.Value(0))[0];
 
   // Start watching position
@@ -26,27 +28,45 @@ export function MapViewWidget({ onLocationTap, onPOITap }: Props) {
     let mounted = true;
     (async () => {
       try {
-        const pos = await getCurrentPosition();
-        if (mounted) {
-          setPosition(pos);
-          setLoading(false);
-          const [addr, poiList] = await Promise.all([
-            reverseGeocode(pos.latitude, pos.longitude),
-            searchNearby(pos.latitude, pos.longitude, undefined, 1000),
-          ]);
+        const granted = await requestPermission();
+        if (!granted) {
           if (mounted) {
-            setAddress(addr);
-            setPois(poiList);
+            setLoading(false);
+            setError("位置权限未授予");
           }
+          return;
         }
-      } catch {
-        if (mounted) setLoading(false);
+        if (!mounted) return;
+
+        const pos = await getCurrentPosition();
+        if (!mounted) return;
+
+        setPosition(pos);
+        setLoading(false);
+        setError(null);
+
+        const [addr, poiList] = await Promise.all([
+          reverseGeocode(pos.latitude, pos.longitude).catch(() => null),
+          searchNearby(pos.latitude, pos.longitude, undefined, 1000).catch(() => []),
+        ]);
+        if (mounted) {
+          if (addr) setAddress(addr);
+          setPois(poiList);
+        }
+      } catch (err) {
+        if (mounted) {
+          setLoading(false);
+          setError(err instanceof Error ? err.message : "定位失败");
+        }
       }
     })();
 
     startWatching((pos) => {
-      if (mounted) setPosition(pos);
-    });
+      if (mounted) {
+        setPosition(pos);
+        setError(null);
+      }
+    }).catch(() => { /* ignore watch errors */ });
 
     return () => {
       mounted = false;
@@ -59,10 +79,12 @@ export function MapViewWidget({ onLocationTap, onPOITap }: Props) {
     Animated.spring(expandAnim, {
       toValue: expanded ? 1 : 0,
       useNativeDriver: false,
+      tension: 65,
+      friction: 11,
     }).start();
   }, [expanded]);
 
-  const maxHeight = expandAnim.interpolate({
+  const mapHeight = expandAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 280],
   });
@@ -77,19 +99,23 @@ export function MapViewWidget({ onLocationTap, onPOITap }: Props) {
     onLocationTap(position.latitude, position.longitude, addrText);
   }, [position, address, onLocationTap]);
 
-  const locationText = address?.formatted
-    ? address.formatted
-    : position
-      ? `${position.latitude.toFixed(4)}, ${position.longitude.toFixed(4)}`
-      : "获取位置中...";
+  const locationText = error
+    ? error
+    : loading
+      ? "获取位置中..."
+      : address?.formatted
+        ? address.formatted
+        : position
+          ? `${position.latitude.toFixed(4)}, ${position.longitude.toFixed(4)}`
+          : "定位不可用";
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: Colors.surface, borderBottomColor: Colors.divider }]}>
       {/* Collapsed bar — always visible */}
-      <TouchableOpacity style={styles.bar} onPress={handleBarPress} activeOpacity={0.7}>
+      <TouchableOpacity style={[styles.bar, { backgroundColor: Colors.mapExpandBg }]} onPress={handleBarPress} activeOpacity={0.7}>
         <View style={styles.barLeft}>
           <Ionicons name="location" size={16} color={Colors.primary} />
-          <Text style={styles.barText} numberOfLines={1}>
+          <Text style={[styles.barText, { color: Colors.textSecondary }]} numberOfLines={1}>
             {locationText}
           </Text>
         </View>
@@ -106,11 +132,11 @@ export function MapViewWidget({ onLocationTap, onPOITap }: Props) {
       </TouchableOpacity>
 
       {/* Expanded map area */}
-      <Animated.View style={[styles.mapArea, { maxHeight }]}>
+      <Animated.View style={[styles.mapArea, { maxHeight: mapHeight }]}>
         {expanded && (
           <>
             {/* Map visual */}
-            <View style={styles.mapVisual}>
+            <View style={[styles.mapVisual, { backgroundColor: Colors.surfaceAlt }]}>
               {isWeb ? (
                 <WebMap lat={position?.latitude} lng={position?.longitude} pois={pois} />
               ) : (
@@ -121,15 +147,15 @@ export function MapViewWidget({ onLocationTap, onPOITap }: Props) {
             {/* POI list */}
             {pois.length > 0 && (
               <View style={styles.poiList}>
-                {pois.slice(0, 3).map((poi, i) => (
+                {pois.slice(0, 3).map((poi) => (
                   <TouchableOpacity
-                    key={i}
-                    style={styles.poiCard}
+                    key={poi.id}
+                    style={[styles.poiCard, { backgroundColor: Colors.surface, borderColor: Colors.border }]}
                     onPress={() => onPOITap?.(poi)}
                   >
                     <Ionicons name="pin" size={12} color={Colors.primary} />
-                    <Text style={styles.poiName} numberOfLines={1}>{poi.name}</Text>
-                    <Text style={styles.poiDist}>{poi.distance}m</Text>
+                    <Text style={[styles.poiName, { color: Colors.textPrimary }]} numberOfLines={1}>{poi.name}</Text>
+                    <Text style={[styles.poiDist, { color: Colors.primary }]}>{poi.distance}m</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -144,6 +170,7 @@ export function MapViewWidget({ onLocationTap, onPOITap }: Props) {
 // ── Web fallback: Amap static map ────────────────────────────
 
 function WebMap({ lat, lng, pois }: { lat?: number; lng?: number; pois: POI[] }) {
+  const { colors: Colors } = useTheme();
   const [apiKey, setApiKey] = useState<string>("");
 
   useEffect(() => {
@@ -156,7 +183,7 @@ function WebMap({ lat, lng, pois }: { lat?: number; lng?: number; pois: POI[] })
     return (
       <View style={styles.mapPlaceholder}>
         <Ionicons name="map-outline" size={32} color={Colors.textTertiary} />
-        <Text style={styles.mapPlaceholderText}>定位中...</Text>
+        <Text style={[styles.mapPlaceholderText, { color: Colors.textTertiary }]}>定位中...</Text>
       </View>
     );
   }
@@ -165,14 +192,14 @@ function WebMap({ lat, lng, pois }: { lat?: number; lng?: number; pois: POI[] })
     return (
       <View style={styles.mapPlaceholder}>
         <Ionicons name="map-outline" size={32} color={Colors.primary} />
-        <Text style={styles.mapPlaceholderText}>配置高德 Key 后显示地图</Text>
-        <Text style={styles.mapCoords}>{lat.toFixed(4)}, {lng.toFixed(4)}</Text>
+        <Text style={[styles.mapPlaceholderText, { color: Colors.textTertiary }]}>配置高德 Key 后显示地图</Text>
+        <Text style={[styles.mapCoords, { color: Colors.textTertiary }]}>{lat.toFixed(4)}, {lng.toFixed(4)}</Text>
       </View>
     );
   }
 
   const markers = `mid,0x1,pin,${lng},${lat}`;
-  const poiMarkers = pois.slice(0, 5).map((p) => `small,0x${Colors.primary.replace("#", "")},pin,${p.longitude},${p.latitude}`).join("|");
+  const poiMarkers = pois.slice(0, 5).map((p) => `small,0x2d6a4f,pin,${p.longitude},${p.latitude}`).join("|");
   const allMarkers = poiMarkers ? `${markers}|${poiMarkers}` : markers;
   const url = `https://restapi.amap.com/v3/staticmap?location=${lng},${lat}&zoom=15&size=600*300&markers=${encodeURIComponent(allMarkers)}&key=${apiKey}`;
 
@@ -181,9 +208,7 @@ function WebMap({ lat, lng, pois }: { lat?: number; lng?: number; pois: POI[] })
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
   },
   bar: {
     flexDirection: "row",
@@ -191,7 +216,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.mapExpandBg,
   },
   barLeft: {
     flexDirection: "row",
@@ -201,7 +225,6 @@ const styles = StyleSheet.create({
   },
   barText: {
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
     marginLeft: Spacing.xs,
     flex: 1,
   },
@@ -218,7 +241,6 @@ const styles = StyleSheet.create({
   },
   mapVisual: {
     height: 200,
-    backgroundColor: Colors.surfaceAlt,
   },
   mapImage: {
     width: "100%",
@@ -232,11 +254,9 @@ const styles = StyleSheet.create({
   },
   mapPlaceholderText: {
     fontSize: FontSize.sm,
-    color: Colors.textTertiary,
   },
   mapCoords: {
     fontSize: FontSize.xs,
-    color: Colors.textTertiary,
     fontFamily: "monospace",
   },
   poiList: {
@@ -244,13 +264,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     gap: Spacing.sm,
+    overflow: "hidden",
   },
   poiCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
     borderRadius: Radius.pill,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
@@ -258,13 +277,11 @@ const styles = StyleSheet.create({
   },
   poiName: {
     fontSize: FontSize.xs,
-    color: Colors.textPrimary,
     marginLeft: 4,
     maxWidth: 80,
   },
   poiDist: {
     fontSize: FontSize.xs,
-    color: Colors.primary,
     marginLeft: 4,
     fontWeight: "600",
   },

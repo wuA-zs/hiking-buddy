@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getApiKey, setApiKey, getBaseUrl, setBaseUrl, getModel, setModel, getAmapKey, setAmapKey } from "../src/lib/config";
-import { Colors, Spacing, FontSize, Radius, Shadows } from "../src/lib/theme";
+import { useTheme, Spacing, FontSize, Radius, Shadows } from "../src/lib/theme";
 
 const MODEL_OPTIONS = [
   { label: "GLM-4-Plus", value: "glm-4-plus" },
@@ -16,6 +17,8 @@ const MODEL_OPTIONS = [
 ];
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
+  const { colors: Colors, isDark } = useTheme();
   const [apiKey, setApiKeyState] = useState("");
   const [baseUrl, setBaseUrlState] = useState("https://open.bigmodel.cn/api/paas/v4");
   const [model, setModelState] = useState(MODEL_OPTIONS[0].value);
@@ -39,13 +42,28 @@ export default function SettingsScreen() {
 
   async function handleSave() {
     try {
-      if (apiKey.trim()) {
-        await setApiKey(apiKey.trim());
+      const trimmedKey = apiKey.trim();
+      const trimmedUrl = baseUrl.trim();
+      const trimmedAmap = amapKey.trim();
+
+      if (trimmedUrl) {
+        try {
+          new URL(trimmedUrl);
+        } catch {
+          Alert.alert("格式错误", "Base URL 不是有效的 URL 地址");
+          return;
+        }
       }
-      await setBaseUrl(baseUrl.trim());
-      await setModel(model);
-      if (amapKey.trim()) {
-        await setAmapKey(amapKey.trim());
+
+      if (trimmedKey) {
+        await setApiKey(trimmedKey);
+      }
+      if (trimmedUrl) {
+        await setBaseUrl(trimmedUrl);
+      }
+      await setModel(model.trim());
+      if (trimmedAmap) {
+        await setAmapKey(trimmedAmap);
       }
       Alert.alert("保存成功", "配置已保存，返回即可开始对话");
     } catch {
@@ -99,29 +117,29 @@ export default function SettingsScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
+    <View style={{ flex: 1, backgroundColor: Colors.bg }}>
+      <StatusBar style={isDark ? "light" : "light"} />
 
       {/* Header */}
       <LinearGradient
         colors={[Colors.primaryDark, Colors.primary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md + 2, paddingTop: insets.top + Spacing.sm, ...Shadows.md }}
       >
-        <Text style={styles.headerTitle}>设置</Text>
+        <Text style={{ fontSize: FontSize.xxl, fontWeight: "700", color: "#fff" }}>设置</Text>
       </LinearGradient>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 40 }}>
         {/* Base URL */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
+        <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginBottom: Spacing.xs }}>
             <Ionicons name="globe-outline" size={18} color={Colors.primary} />
-            <Text style={styles.label}>Base URL</Text>
+            <Text style={{ fontSize: FontSize.lg, fontWeight: "600", color: Colors.textPrimary }}>Base URL</Text>
           </View>
-          <Text style={styles.hint}>OpenAI 兼容 API 地址</Text>
+          <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, marginBottom: Spacing.md }}>OpenAI 兼容 API 地址</Text>
           <TextInput
-            style={styles.input}
+            style={{ borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, padding: Spacing.md, fontSize: FontSize.md, color: Colors.textPrimary, backgroundColor: Colors.bg }}
             value={baseUrl}
             onChangeText={setBaseUrlState}
             placeholder="https://open.bigmodel.cn/api/paas/v4"
@@ -129,18 +147,19 @@ export default function SettingsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
+            accessibilityLabel="Base URL"
           />
         </View>
 
         {/* API Key */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
+        <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginBottom: Spacing.xs }}>
             <Ionicons name="key-outline" size={18} color={Colors.primary} />
-            <Text style={styles.label}>API Key</Text>
+            <Text style={{ fontSize: FontSize.lg, fontWeight: "600", color: Colors.textPrimary }}>API Key</Text>
           </View>
-          <Text style={styles.hint}>必填，用于 LLM 对话</Text>
+          <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, marginBottom: Spacing.md }}>必填，用于 LLM 对话</Text>
           <TextInput
-            style={styles.input}
+            style={{ borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, padding: Spacing.md, fontSize: FontSize.md, color: Colors.textPrimary, backgroundColor: Colors.bg }}
             value={apiKey}
             onChangeText={setApiKeyState}
             placeholder="sk-..."
@@ -148,31 +167,39 @@ export default function SettingsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
+            accessibilityLabel="API Key"
           />
         </View>
 
         {/* Model */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
+        <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginBottom: Spacing.xs }}>
             <Ionicons name="hardware-chip-outline" size={18} color={Colors.primary} />
-            <Text style={styles.label}>模型</Text>
+            <Text style={{ fontSize: FontSize.lg, fontWeight: "600", color: Colors.textPrimary }}>模型</Text>
           </View>
-          <Text style={styles.hint}>选择对话使用的模型</Text>
-          <View style={styles.modelGrid}>
+          <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, marginBottom: Spacing.md }}>选择对话使用的模型</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm }}>
             {MODEL_OPTIONS.map((opt) => (
               <TouchableOpacity
                 key={opt.value}
-                style={[styles.modelOption, model === opt.value && styles.modelOptionActive]}
+                style={{
+                  paddingHorizontal: Spacing.md,
+                  paddingVertical: Spacing.sm,
+                  borderRadius: Radius.pill,
+                  borderWidth: 1.5,
+                  borderColor: model === opt.value ? Colors.primary : Colors.border,
+                  backgroundColor: model === opt.value ? Colors.mapExpandBg : Colors.surface,
+                }}
                 onPress={() => setModelState(opt.value)}
               >
-                <Text style={[styles.modelOptionText, model === opt.value && styles.modelOptionTextActive]}>
+                <Text style={{ fontSize: FontSize.sm, color: model === opt.value ? Colors.primary : Colors.textSecondary, fontWeight: model === opt.value ? "600" : "400" }}>
                   {opt.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
           <TextInput
-            style={[styles.input, { marginTop: Spacing.sm }]}
+            style={{ borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, padding: Spacing.md, fontSize: FontSize.md, color: Colors.textPrimary, backgroundColor: Colors.bg, marginTop: Spacing.sm }}
             value={model}
             onChangeText={setModelState}
             placeholder="或输入自定义模型名称"
@@ -183,14 +210,14 @@ export default function SettingsScreen() {
         </View>
 
         {/* Amap Key */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
+        <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginBottom: Spacing.xs }}>
             <Ionicons name="map-outline" size={18} color={Colors.primary} />
-            <Text style={styles.label}>高德地图 Key</Text>
+            <Text style={{ fontSize: FontSize.lg, fontWeight: "600", color: Colors.textPrimary }}>高德地图 Key</Text>
           </View>
-          <Text style={styles.hint}>可选，用于逆地理编码和附近搜索</Text>
+          <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, marginBottom: Spacing.md }}>可选，用于逆地理编码和附近搜索</Text>
           <TextInput
-            style={styles.input}
+            style={{ borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, padding: Spacing.md, fontSize: FontSize.md, color: Colors.textPrimary, backgroundColor: Colors.bg }}
             value={amapKey}
             onChangeText={setAmapKeyState}
             placeholder="高德 Web服务 API Key"
@@ -201,9 +228,9 @@ export default function SettingsScreen() {
         </View>
 
         {/* Buttons */}
-        <View style={styles.buttonRow}>
+        <View style={{ flexDirection: "row", gap: Spacing.md, marginTop: Spacing.sm }}>
           <TouchableOpacity
-            style={[styles.testButton, testing && styles.buttonDisabled]}
+            style={{ flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: Spacing.xs, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.lg, padding: Spacing.md + 2, backgroundColor: Colors.surface, opacity: testing ? 0.6 : 1 }}
             onPress={handleTest}
             disabled={testing}
           >
@@ -212,162 +239,25 @@ export default function SettingsScreen() {
             ) : (
               <Ionicons name="flash-outline" size={18} color={Colors.primary} />
             )}
-            <Text style={styles.testButtonText}>测试连通</Text>
+            <Text style={{ color: Colors.primary, fontSize: FontSize.md, fontWeight: "600" }}>测试连通</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: Spacing.xs, borderRadius: Radius.lg, padding: Spacing.md + 2, backgroundColor: Colors.primary, ...Shadows.md }}
+            onPress={handleSave}
+          >
             <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-            <Text style={styles.saveButtonText}>保存配置</Text>
+            <Text style={{ color: "#fff", fontSize: FontSize.md, fontWeight: "600" }}>保存配置</Text>
           </TouchableOpacity>
         </View>
 
         {/* About */}
-        <View style={styles.about}>
-          <Text style={styles.aboutTitle}>关于</Text>
-          <Text style={styles.aboutText}>徒步搭子 — 你的 AI 徒步向导</Text>
-          <Text style={styles.aboutText}>基于 pi-agent-core 架构，使用 Claude AI 驱动</Text>
+        <View style={{ marginTop: Spacing.xxxl, paddingTop: Spacing.xl, borderTopWidth: 1, borderTopColor: Colors.divider }}>
+          <Text style={{ fontSize: FontSize.sm, fontWeight: "600", color: Colors.textSecondary, marginBottom: Spacing.sm }}>关于</Text>
+          <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, lineHeight: 20 }}>徒步搭子 — 你的 AI 徒步向导</Text>
+          <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, lineHeight: 20 }}>基于 pi-agent-core 架构，使用 AI 驱动</Text>
         </View>
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md + 2,
-    paddingTop: Spacing.xxl + 10,
-    ...Shadows.md,
-  },
-  headerTitle: {
-    fontSize: FontSize.xxl,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    padding: Spacing.lg,
-    paddingBottom: 40,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    ...Shadows.sm,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    marginBottom: Spacing.xs,
-  },
-  label: {
-    fontSize: FontSize.lg,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-  hint: {
-    fontSize: FontSize.sm,
-    color: Colors.textTertiary,
-    marginBottom: Spacing.md,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    fontSize: FontSize.md,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.bg,
-  },
-  modelGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.sm,
-  },
-  modelOption: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.pill,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  modelOptionActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.mapExpandBg,
-  },
-  modelOptionText: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-  },
-  modelOptionTextActive: {
-    color: Colors.primary,
-    fontWeight: "600",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginTop: Spacing.sm,
-  },
-  testButton: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: Spacing.xs,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    borderRadius: Radius.lg,
-    padding: Spacing.md + 2,
-    backgroundColor: Colors.surface,
-  },
-  testButtonText: {
-    color: Colors.primary,
-    fontSize: FontSize.md,
-    fontWeight: "600",
-  },
-  saveButton: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: Spacing.xs,
-    borderRadius: Radius.lg,
-    padding: Spacing.md + 2,
-    backgroundColor: Colors.primary,
-    ...Shadows.md,
-  },
-  saveButtonText: {
-    color: "#fff",
-    fontSize: FontSize.md,
-    fontWeight: "600",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  about: {
-    marginTop: Spacing.xxxl,
-    paddingTop: Spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-  },
-  aboutTitle: {
-    fontSize: FontSize.sm,
-    fontWeight: "600",
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-  },
-  aboutText: {
-    fontSize: FontSize.sm,
-    color: Colors.textTertiary,
-    lineHeight: 20,
-  },
-});

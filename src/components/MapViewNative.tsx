@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import type { POI } from "../services/maps";
-import { Colors, Spacing, FontSize } from "../lib/theme";
+import { useTheme, Spacing, FontSize } from "../lib/theme";
 
 interface Props {
   lat?: number;
@@ -13,11 +13,13 @@ interface Props {
 }
 
 export function MapViewNative({ lat, lng, pois, onPOITap }: Props) {
+  const { colors: Colors } = useTheme();
+
   if (!lat || !lng) {
     return (
-      <View style={styles.placeholder}>
+      <View style={[styles.placeholder, { backgroundColor: Colors.surfaceAlt }]}>
         <Ionicons name="map-outline" size={32} color={Colors.textTertiary} />
-        <Text style={styles.placeholderText}>定位中...</Text>
+        <Text style={[styles.placeholderText, { color: Colors.textTertiary }]}>定位中...</Text>
       </View>
     );
   }
@@ -33,12 +35,14 @@ export function MapViewNative({ lat, lng, pois, onPOITap }: Props) {
       }}
       showsUserLocation
       showsMyLocationButton={false}
-      scrollEnabled={false}
-      zoomEnabled={false}
+      scrollEnabled
+      zoomEnabled
+      pitchEnabled={false}
+      rotateEnabled={false}
     >
-      {pois.map((poi, i) => (
+      {pois.map((poi) => (
         <Marker
-          key={i}
+          key={poi.id}
           coordinate={{ latitude: poi.latitude, longitude: poi.longitude }}
           title={poi.name}
           description={`${poi.distance}m · ${poi.address}`}
@@ -62,6 +66,5 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     fontSize: FontSize.sm,
-    color: Colors.textTertiary,
   },
 });

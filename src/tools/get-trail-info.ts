@@ -3,8 +3,8 @@ import { getCurrentPosition } from "../services/location";
 
 export const getTrailInfoTool: AgentTool = {
   name: "get_trail_info",
-  label: "获取步道信息",
-  description: "获取用户附近的步道路线信息，包括距离、难度和预计时间。当用户问路线、需要导航时调用。",
+  label: "获取步道信息（实验性）",
+  description: "[实验性功能] 获取用户附近的步道路线信息。注意：当前数据来源有限，结果可能不准确。仅在用户明确询问步道详情时调用，否则优先使用 search_nearby 和 plan_route 工具。",
   parameters: {
     type: "object",
     properties: {

@@ -18,6 +18,33 @@ interface RouteResult {
   polyline?: string;
 }
 
+// Amap API response types
+interface AmapStep {
+  instruction?: string;
+  road?: string;
+  distance?: string | number;
+  duration?: string | number;
+}
+
+interface AmapPath {
+  distance?: string | number;
+  duration?: string | number;
+  steps?: AmapStep[];
+}
+
+interface AmapRidingStep {
+  instruction?: string;
+  road?: string;
+  distance?: string | number;
+  duration?: string | number;
+}
+
+interface AmapRidingPath {
+  distance?: string | number;
+  duration?: string | number;
+  steps?: AmapRidingStep[];
+}
+
 export async function planRoute(
   originLat: number,
   originLng: number,
@@ -71,14 +98,14 @@ export async function planRoute(
       routes.push(parsePath(path, origin, destination));
     }
   } else if (mode === "riding") {
-    const path = data.data?.paths?.[0];
+    const path: AmapRidingPath | undefined = data.data?.paths?.[0];
     if (!path) throw new Error("未找到骑行路线");
     routes.push({
       origin,
       destination,
       distance: Number(path.distance) || 0,
       duration: Number(path.duration) || 0,
-      steps: (path.steps ?? []).map((s: any) => ({
+      steps: (path.steps ?? []).map((s) => ({
         instruction: s.instruction ?? "",
         road: s.road ?? undefined,
         distance: Number(s.distance) || 0,
@@ -115,8 +142,8 @@ export async function planRoute(
   return routes;
 }
 
-function parsePath(path: any, origin: string, destination: string): RouteResult {
-  const steps: RouteStep[] = (path.steps ?? []).map((s: any) => ({
+function parsePath(path: AmapPath, origin: string, destination: string): RouteResult {
+  const steps: RouteStep[] = (path.steps ?? []).map((s) => ({
     instruction: s.instruction ?? "",
     road: s.road ?? undefined,
     distance: Number(s.distance) || 0,
@@ -179,7 +206,7 @@ export const routePlanningTool: AgentTool = {
     const mode = (params.mode as string) ?? "walking";
 
     const pos = await getCurrentPosition();
-    const routes = await planRoute(pos.latitude, pos.longitude, destLat, destLng, mode as any);
+    const routes = await planRoute(pos.latitude, pos.longitude, destLat, destLng, mode as "walking" | "driving" | "riding" | "transit");
 
     if (routes.length === 0) {
       return {

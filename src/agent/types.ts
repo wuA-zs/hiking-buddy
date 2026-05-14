@@ -26,12 +26,14 @@ export interface ToolCall {
 }
 
 export interface UserMessage {
+  id: string;
   role: "user";
   content: (TextContent | ImageContent)[];
   timestamp: number;
 }
 
 export interface AssistantMessage {
+  id: string;
   role: "assistant";
   content: (TextContent | ToolCall)[];
   stopReason: "stop" | "toolUse" | "error" | "aborted" | "length";
@@ -42,6 +44,7 @@ export interface AssistantMessage {
 }
 
 export interface ToolResultMessage {
+  id: string;
   role: "toolResult";
   toolCallId: string;
   toolName: string;
@@ -51,6 +54,11 @@ export interface ToolResultMessage {
 }
 
 export type AgentMessage = UserMessage | AssistantMessage | ToolResultMessage;
+
+/** Generate a unique message ID (timestamp + random). */
+export function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 // ============================================================================
 // Tool Types

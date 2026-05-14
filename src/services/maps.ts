@@ -14,6 +14,7 @@ export interface Address {
 }
 
 export interface POI {
+  id: string;
   name: string;
   type: string;
   distance: number;
@@ -69,10 +70,11 @@ export async function searchNearby(
     );
     const data = await resp.json();
     if (data.status === "1" && data.pois) {
-      return data.pois.map((poi: any) => {
+      return data.pois.map((poi: { name: string; type?: string; distance?: string | number; location?: string; pname?: string; address?: string }) => {
         const [poiLng, poiLat] = (poi.location ?? "0,0").split(",").map(Number);
         const dist = poi.distance ? Number(poi.distance) : 0;
         return {
+          id: `${poi.name}-${poi.location ?? "0,0"}`,
           name: poi.name,
           type: poi.type ?? "",
           distance: dist,

@@ -70,6 +70,7 @@ function weatherCodeToDescription(code: number): string {
     71: "小雪",
     73: "中雪",
     75: "大雪",
+    77: "雪粒",
     80: "阵雨",
     81: "中阵雨",
     82: "大阵雨",

@@ -12,30 +12,37 @@ export const getLocationTool: AgentTool = {
     required: [],
   },
   execute: async (): Promise<AgentToolResult> => {
-    const granted = await requestPermission();
-    if (!granted) {
+    try {
+      const granted = await requestPermission();
+      if (!granted) {
+        return {
+          content: [{ type: "text", text: "用户未授予定位权限，无法获取位置。请在系统设置中开启位置权限。" }],
+        };
+      }
+
+      const pos = await getCurrentPosition();
+      const addr = await reverseGeocode(pos.latitude, pos.longitude);
+
+      const lines = [
+        `地址: ${addr.formatted}`,
+        `坐标: ${pos.latitude.toFixed(6)}, ${pos.longitude.toFixed(6)}`,
+        `海拔: ${pos.altitude?.toFixed(0) ?? "未知"} 米`,
+        `精度: ${pos.accuracy?.toFixed(0) ?? "未知"} 米`,
+      ];
+
+      if (pos.speed !== null && pos.speed > 0) {
+        lines.push(`移动速度: ${(pos.speed * 3.6).toFixed(1)} km/h`);
+      }
+
       return {
-        content: [{ type: "text", text: "用户未授予定位权限，无法获取位置。" }],
+        content: [{ type: "text", text: lines.join("\n") }],
+        details: { ...pos, address: addr },
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: "text", text: `获取位置失败: ${msg}。请检查设备定位服务是否开启。` }],
       };
     }
-
-    const pos = await getCurrentPosition();
-    const addr = await reverseGeocode(pos.latitude, pos.longitude);
-
-    const lines = [
-      `地址: ${addr.formatted}`,
-      `坐标: ${pos.latitude.toFixed(6)}, ${pos.longitude.toFixed(6)}`,
-      `海拔: ${pos.altitude?.toFixed(0) ?? "未知"} 米`,
-      `精度: ${pos.accuracy?.toFixed(0) ?? "未知"} 米`,
-    ];
-
-    if (pos.speed !== null && pos.speed > 0) {
-      lines.push(`移动速度: ${(pos.speed * 3.6).toFixed(1)} km/h`);
-    }
-
-    return {
-      content: [{ type: "text", text: lines.join("\n") }],
-      details: { ...pos, address: addr },
-    };
   },
 };

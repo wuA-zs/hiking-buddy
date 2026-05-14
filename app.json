@@ -10,8 +10,9 @@
     "newArchEnabled": true,
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
-      }
+        "projectId": "3c2a5d43-f357-443a-b983-936c2fabe54c"
+      },
+      "router": {}
     },
     "ios": {
       "supportsTablet": true,
@@ -29,9 +30,10 @@
       },
       "package": "com.hikingbuddy.app",
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "CAMERA"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [

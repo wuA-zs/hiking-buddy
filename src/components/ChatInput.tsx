@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Spacing, FontSize, Radius, Shadows } from "../lib/theme";
+import { useTheme, Spacing, FontSize, Radius, Shadows } from "../lib/theme";
 
 interface Props {
   onSend: (text: string) => void;
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export function ChatInput({ onSend, onPhoto, disabled }: Props) {
+  const { colors: Colors } = useTheme();
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
 
@@ -24,14 +25,17 @@ export function ChatInput({ onSend, onPhoto, disabled }: Props) {
   const canSend = text.trim().length > 0 && !disabled;
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.photoButton} onPress={onPhoto} disabled={disabled}>
+    <View style={[styles.container, { backgroundColor: Colors.surface, borderTopColor: Colors.divider }]}>
+      <TouchableOpacity style={[styles.photoButton, { backgroundColor: Colors.primaryAlpha20 }]} onPress={onPhoto} disabled={disabled} accessibilityLabel="拍照" accessibilityRole="button">
         <Ionicons name="camera-outline" size={22} color={Colors.primary} />
       </TouchableOpacity>
 
-      <View style={[styles.inputWrap, focused && styles.inputWrapFocused]}>
+      <View style={[
+        styles.inputWrap,
+        focused ? { ...styles.inputWrapFocused, borderColor: Colors.primaryLight, backgroundColor: Colors.surface } : { backgroundColor: Colors.surfaceAlt, borderColor: "transparent" },
+      ]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: Colors.textPrimary }]}
           value={text}
           onChangeText={setText}
           placeholder="问问小Pi..."
@@ -47,9 +51,9 @@ export function ChatInput({ onSend, onPhoto, disabled }: Props) {
         />
       </View>
 
-      <TouchableOpacity onPress={handleSend} disabled={!canSend} activeOpacity={0.7}>
+      <TouchableOpacity onPress={handleSend} disabled={!canSend} activeOpacity={0.7} accessibilityLabel="发送消息" accessibilityRole="button">
         <LinearGradient
-          colors={canSend ? Colors.bubbleUserGradient : ["#ccc", "#bbb"]}
+          colors={canSend ? Colors.bubbleUserGradient : ["#d1d5db", "#d1d5db"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.sendButton}
@@ -72,9 +76,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     paddingBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
     borderTopWidth: 1,
-    borderTopColor: Colors.divider,
   },
   photoButton: {
     width: 40,
@@ -82,31 +84,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryAlpha20,
     marginBottom: Spacing.xs,
   },
   inputWrap: {
     flex: 1,
     minHeight: 42,
     maxHeight: 120,
-    backgroundColor: Colors.surfaceAlt,
     borderRadius: Radius.xl,
     marginHorizontal: Spacing.sm,
     borderWidth: 1.5,
-    borderColor: "transparent",
     ...Shadows.sm,
   },
   inputWrapFocused: {
-    borderColor: Colors.primaryLight,
-    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
   },
   input: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md - 2,
+    paddingVertical: Spacing.sm + 2,
     fontSize: FontSize.md,
-    color: Colors.textPrimary,
     maxHeight: 110,
+    textAlignVertical: "top",
   },
   sendButton: {
     width: 42,

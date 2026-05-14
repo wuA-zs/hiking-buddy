@@ -1,10 +1,13 @@
 /**
  * Shared theme — colors, spacing, typography, helpers
+ * Supports light and dark mode via useTheme() hook.
  */
 
-// ── Color Palette ────────────────────────────────────────────
+import { useColorScheme } from "react-native";
 
-export const Colors = {
+// ── Color Palettes ────────────────────────────────────────────
+
+const LightColors = {
   // Primary (forest green gradient)
   primary: "#2d6a4f",
   primaryDark: "#1b4332",
@@ -13,7 +16,6 @@ export const Colors = {
 
   // Backgrounds
   bg: "#f8faf8",
-  bgDark: "#0f1419",
   surface: "#ffffff",
   surfaceAlt: "#f0f4f0",
 
@@ -44,6 +46,55 @@ export const Colors = {
   // Map
   mapExpandBg: "#e8f5ee",
 };
+
+const DarkColors = {
+  primary: "#52b788",
+  primaryDark: "#2d6a4f",
+  primaryLight: "#74c69d",
+  primaryAlpha20: "rgba(82,183,136,0.25)",
+
+  bg: "#0f1419",
+  surface: "#1a2332",
+  surfaceAlt: "#141d29",
+
+  textPrimary: "#e8eaed",
+  textSecondary: "#9aa0a6",
+  textTertiary: "#6b7280",
+  textOnPrimary: "#ffffff",
+  textOnSurface: "#d1d5db",
+
+  border: "#2d3748",
+  divider: "#1e2d3d",
+
+  error: "#f87171",
+  warning: "#fbbf24",
+  info: "#60a5fa",
+
+  bubbleUser: "#2d6a4f",
+  bubbleUserGradient: ["#1b4332", "#2d6a4f"] as [string, string],
+  bubbleAssistant: "#1e2d3d",
+  bubbleAssistantBorder: "#2d4a3e",
+  toolCallBg: "#1a3a2a",
+  toolCallBorder: "#2d5a3e",
+
+  mapExpandBg: "#1a2d22",
+};
+
+// Re-export Colors for backward compat (light mode default)
+export const Colors = LightColors;
+
+// ── Theme Hook ────────────────────────────────────────────────
+
+export type ThemeColors = typeof LightColors;
+
+export function useTheme(): { colors: ThemeColors; isDark: boolean } {
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
+  return {
+    colors: isDark ? DarkColors : LightColors,
+    isDark,
+  };
+}
 
 // ── Spacing ──────────────────────────────────────────────────
 

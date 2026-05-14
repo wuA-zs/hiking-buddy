@@ -7,13 +7,14 @@ import * as Speech from "expo-speech";
 let isSpeaking = false;
 
 export async function speak(text: string, language = "zh-CN"): Promise<void> {
-  // Don't queue multiple speeches
+  // Stop any ongoing speech before starting new one
   if (isSpeaking) {
     Speech.stop();
+    isSpeaking = false;
   }
 
-  isSpeaking = true;
   return new Promise((resolve) => {
+    isSpeaking = true;
     Speech.speak(text, {
       language,
       rate: 1.0,
@@ -35,8 +36,10 @@ export async function speak(text: string, language = "zh-CN"): Promise<void> {
 }
 
 export function stopSpeaking(): void {
-  Speech.stop();
-  isSpeaking = false;
+  if (isSpeaking) {
+    Speech.stop();
+    isSpeaking = false;
+  }
 }
 
 export function getIsSpeaking(): boolean {

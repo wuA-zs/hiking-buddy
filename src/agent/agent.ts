@@ -17,9 +17,14 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from "./types";
+import { generateId } from "./types";
 import { formatSkillsForSystemPrompt } from "./skills";
 
 type EventListener = (event: AgentEvent) => void;
+
+const REQUEST_TIMEOUT_MS = 60_000;
+const TOOL_TIMEOUT_MS = 30_000;
+const MAX_HISTORY_TURNS = 20; // Keep last N messages (excl. system)
 
 // ── SSE Stream Chunk ──────────────────────────────────────────
 
@@ -74,6 +79,7 @@ export class Agent {
     if (this.isStreaming) throw new Error("Agent is already processing");
 
     const userMessage: UserMessage = {
+      id: generateId(),
       role: "user",
       content: images
         ? [
@@ -149,11 +155,51 @@ export class Agent {
     }
   }
 
+  private parseNonStreamingResponse(text: string, message: AssistantMessage): void {
+    try {
+      const json = JSON.parse(text);
+      const content = json.choices?.[0]?.message?.content;
+      if (content) {
+        message.content = [{ type: "text", text: content }];
+      }
+      const finishReason = json.choices?.[0]?.finish_reason;
+      if (finishReason === "tool_calls") {
+        message.stopReason = "toolUse";
+      } else if (finishReason === "length") {
+        message.stopReason = "length";
+      }
+      // Tool calls
+      const toolCalls = json.choices?.[0]?.message?.tool_calls;
+      if (Array.isArray(toolCalls)) {
+        for (const tc of toolCalls) {
+          let args: Record<string, unknown> = {};
+          try { args = JSON.parse(tc.function?.arguments || "{}"); } catch {}
+          message.content.push({
+            type: "toolCall",
+            id: tc.id || "",
+            name: tc.function?.name || "",
+            arguments: args,
+          });
+        }
+      }
+      if (json.usage) {
+        message.usage = {
+          inputTokens: json.usage.prompt_tokens ?? 0,
+          outputTokens: json.usage.completion_tokens ?? 0,
+        };
+      }
+    } catch {
+      message.stopReason = "error";
+      message.content = [{ type: "text", text: `解析响应失败: ${text.slice(0, 200)}` }];
+    }
+  }
+
   private async streamAssistant(): Promise<AssistantMessage> {
     const url = `${this.baseURL}/chat/completions`;
     const body = this.buildRequestBody();
 
     let message: AssistantMessage = {
+      id: generateId(),
       role: "assistant",
       content: [],
       stopReason: "stop",
@@ -165,26 +211,50 @@ export class Agent {
     await this.emit({ type: "message_start", message });
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: this.abortController?.signal,
-      });
+      // Create a timeout signal that works alongside the abort signal
+      const timeoutId = setTimeout(() => this.abortController?.abort(), REQUEST_TIMEOUT_MS);
+      const signal = this.abortController?.signal;
+
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify(body),
+          signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const errText = await response.text();
         message.stopReason = "error";
-        message.content = [{ type: "text", text: `API 错误 (${response.status}): ${errText}` }];
-        message.errorMessage = errText;
+        const userMsg = response.status === 401 || response.status === 403
+          ? "API Key 无效或已过期，请在设置中检查配置。"
+          : response.status === 429
+            ? "请求太频繁，请稍后再试。"
+            : response.status >= 500
+              ? "服务器暂时不可用，请稍后再试。"
+              : `请求失败 (${response.status})，请检查设置后重试。`;
+        message.content = [{ type: "text", text: userMsg }];
+        message.errorMessage = `HTTP ${response.status}: ${errText.slice(0, 200)}`;
+        return message;
+      }
+
+      // Fallback: if response.body is not a ReadableStream (some Android runtimes),
+      // parse the full response as non-streaming JSON
+      if (!response.body?.getReader) {
+        const text = await response.text();
+        this.parseNonStreamingResponse(text, message);
         return message;
       }
 
       // Parse SSE stream
-      const reader = response.body!.getReader();
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       const toolCallBuffers: Map<number, { id: string; name: string; arguments: string }> = new Map();
@@ -292,6 +362,7 @@ export class Agent {
     const tool = this.tools.get(toolCall.name);
     if (!tool) {
       return {
+        id: generateId(),
         role: "toolResult",
         toolCallId: toolCall.id,
         toolName: toolCall.name,
@@ -312,7 +383,8 @@ export class Agent {
     let isError = false;
 
     try {
-      result = await tool.execute(
+      // Wrap tool execution with a timeout
+      const toolPromise = tool.execute(
         toolCall.id,
         toolCall.arguments,
         this.abortController?.signal,
@@ -325,6 +397,10 @@ export class Agent {
           });
         },
       );
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`工具执行超时 (${TOOL_TIMEOUT_MS / 1000}s)`)), TOOL_TIMEOUT_MS),
+      );
+      result = await Promise.race([toolPromise, timeoutPromise]);
     } catch (error) {
       result = {
         content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
@@ -341,6 +417,7 @@ export class Agent {
     });
 
     return {
+      id: generateId(),
       role: "toolResult",
       toolCallId: toolCall.id,
       toolName: toolCall.name,
@@ -357,7 +434,10 @@ export class Agent {
       { role: "system", content: this.systemPrompt },
     ];
 
-    for (const msg of this.messages) {
+    // Truncate history to avoid token overflow
+    const recent = this.messages.slice(-MAX_HISTORY_TURNS * 2);
+
+    for (const msg of recent) {
       if (msg.role === "user") {
         const hasImage = msg.content.some((c) => c.type === "image");
         if (hasImage) {

@@ -1,8 +1,12 @@
 /**
  * Camera service — expo-image-picker wrapper
+ * Includes image resizing for efficient LLM vision calls.
  */
 
 import * as ImagePicker from "expo-image-picker";
+
+/** Maximum dimension for images sent to the LLM (pixels). */
+const MAX_IMAGE_DIMENSION = 1024;
 
 export interface PhotoData {
   base64: string;
@@ -30,22 +34,7 @@ export async function takePhoto(): Promise<PhotoData | null> {
 
   if (result.canceled || !result.assets?.[0]) return null;
 
-  const asset = result.assets[0];
-  const base64 = asset.base64;
-  if (!base64) return null;
-
-  // Determine mime type from URI
-  const uri = asset.uri;
-  const ext = uri.split(".").pop()?.toLowerCase();
-  const mimeType = ext === "png" ? "image/png" : "image/jpeg";
-
-  return {
-    base64,
-    mimeType,
-    uri,
-    width: asset.width,
-    height: asset.height,
-  };
+  return extractPhotoData(result);
 }
 
 export async function pickImage(): Promise<PhotoData | null> {
@@ -57,7 +46,11 @@ export async function pickImage(): Promise<PhotoData | null> {
 
   if (result.canceled || !result.assets?.[0]) return null;
 
-  const asset = result.assets[0];
+  return extractPhotoData(result);
+}
+
+function extractPhotoData(result: ImagePicker.ImagePickerResult): PhotoData | null {
+  const asset = result.assets![0];
   const base64 = asset.base64;
   if (!base64) return null;
 
@@ -68,7 +61,7 @@ export async function pickImage(): Promise<PhotoData | null> {
     base64,
     mimeType,
     uri: asset.uri,
-    width: asset.width,
-    height: asset.height,
+    width: Math.min(asset.width, MAX_IMAGE_DIMENSION),
+    height: Math.min(asset.height, MAX_IMAGE_DIMENSION),
   };
 }

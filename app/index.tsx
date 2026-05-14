@@ -12,16 +12,18 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Agent } from "../src/agent/agent";
 import { loadSkills } from "../src/agent/skills";
 import { createHikingTools } from "../src/tools/index";
 import { getApiKey, getBaseUrl, getModel } from "../src/lib/config";
-import { Colors, Spacing, FontSize, Radius, Shadows } from "../src/lib/theme";
+import { useTheme, Spacing, FontSize, Radius, Shadows } from "../src/lib/theme";
 import { takePhoto } from "../src/services/camera";
 import { speak, stopSpeaking } from "../src/services/tts";
 import { getCurrentPosition } from "../src/services/location";
 import { reverseGeocode } from "../src/services/maps";
+import { generateId } from "../src/agent/types";
 import type { AgentEvent, AgentMessage, AssistantMessage, UserMessage } from "../src/agent/types";
 import type { POI } from "../src/services/maps";
 
@@ -31,6 +33,7 @@ import { ChatBubble } from "../src/components/ChatBubble";
 import { ChatInput } from "../src/components/ChatInput";
 import { StreamingText } from "../src/components/StreamingText";
 import { MapViewWidget } from "../src/components/MapViewWidget";
+import { ErrorBoundary } from "../src/components/ErrorBoundary";
 
 const SYSTEM_PROMPT = `你是一个手机徒步搭子应用的核心 AI 向导"小Pi"。
 
@@ -46,106 +49,159 @@ const SYSTEM_PROMPT = `你是一个手机徒步搭子应用的核心 AI 向导"�
 
 export default function ChatScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors: Colors, isDark } = useTheme();
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [streamingMessage, setStreamingMessage] = useState<AssistantMessage | undefined>();
   const [isStreaming, setIsStreaming] = useState(false);
+  const [agentReady, setAgentReady] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const agentRef = useRef<Agent | null>(null);
   const ttsRef = useRef(ttsEnabled);
+  const mountedRef = useRef(true);
   ttsRef.current = ttsEnabled;
 
   useEffect(() => {
+    mountedRef.current = true;
     initAgent();
+    return () => {
+      mountedRef.current = false;
+      agentRef.current?.abort();
+    };
   }, []);
 
   async function initAgent() {
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-      Alert.alert("需要 API Key", "请先在设置中配置 API Key", [
-        { text: "去设置", onPress: () => router.push("/settings") },
-      ]);
-      return;
-    }
+    try {
+      setAgentReady(false);
+      setAgentError(null);
 
-    const baseURL = (await getBaseUrl()) || "https://api.openai.com/v1";
-    const model = await getModel();
-    const skills = loadSkills({
-      "hiking-guide": hikingGuide,
-      "photo-explainer": photoExplainer,
-      "location-narrator": locationNarrator,
-      "safety-advisor": safetyAdvisor,
-      "trail-navigator": trailNavigator,
-      "amap-lbs": amapLbs,
-    });
-
-    const tools = createHikingTools();
-    const agent = new Agent({ apiKey, baseURL, model, systemPrompt: SYSTEM_PROMPT, tools, skills });
-
-    agent.subscribe((event: AgentEvent) => {
-      switch (event.type) {
-        case "message_start":
-          if (event.message.role === "assistant") {
-            setStreamingMessage({ ...event.message } as AssistantMessage);
-          }
-          break;
-        case "message_update":
-          setStreamingMessage({ ...event.message } as AssistantMessage);
-          break;
-        case "message_end":
-          if (event.message.role === "assistant") {
-            setStreamingMessage(undefined);
-            setMessages((prev) => [...prev, event.message]);
-            // TTS
-            if (ttsRef.current) {
-              const text = (event.message as AssistantMessage).content
-                .filter((c): c is { type: "text"; text: string } => c.type === "text")
-                .map((c) => c.text)
-                .join("");
-              if (text) speak(text);
-            }
-          }
-          break;
-        case "agent_start":
-          setIsStreaming(true);
-          break;
-        case "agent_end":
-          setIsStreaming(false);
-          break;
+      const apiKey = await getApiKey();
+      if (!apiKey) {
+        if (!mountedRef.current) return;
+        setAgentError("请先在设置中配置 API Key");
+        Alert.alert("需要 API Key", "请先在设置中配置 API Key", [
+          { text: "去设置", onPress: () => router.push("/settings") },
+        ]);
+        return;
       }
-    });
 
-    agentRef.current = agent;
+      const baseURL = (await getBaseUrl()) || "https://api.openai.com/v1";
+      const model = await getModel();
+      const skills = loadSkills({
+        "hiking-guide": hikingGuide,
+        "photo-explainer": photoExplainer,
+        "location-narrator": locationNarrator,
+        "safety-advisor": safetyAdvisor,
+        "trail-navigator": trailNavigator,
+        "amap-lbs": amapLbs,
+      });
 
-    setMessages([
-      {
-        role: "assistant",
-        content: [{ type: "text", text: "你好！我是小Pi 🥾，你的徒步搭子。今天想去哪走走？你可以拍照让我认认花草，也可以让我讲讲附近的故事。" }],
-        stopReason: "stop",
-        model: "hiking-buddy",
-        usage: { inputTokens: 0, outputTokens: 0 },
-        timestamp: Date.now(),
-      },
-    ]);
+      const tools = createHikingTools();
+      const agent = new Agent({ apiKey, baseURL, model, systemPrompt: SYSTEM_PROMPT, tools, skills });
+
+      agent.subscribe((event: AgentEvent) => {
+        if (!mountedRef.current) return;
+
+        switch (event.type) {
+          case "message_start":
+            if (event.message.role === "assistant") {
+              setStreamingMessage({ ...event.message } as AssistantMessage);
+            }
+            break;
+          case "message_update":
+            setStreamingMessage({ ...event.message } as AssistantMessage);
+            break;
+          case "message_end":
+            if (event.message.role === "assistant") {
+              setStreamingMessage(undefined);
+              setMessages((prev) => [...prev, event.message]);
+              // TTS
+              if (ttsRef.current) {
+                const text = (event.message as AssistantMessage).content
+                  .filter((c): c is { type: "text"; text: string } => c.type === "text")
+                  .map((c) => c.text)
+                  .join("");
+                if (text) speak(text);
+              }
+            }
+            break;
+          case "agent_start":
+            setIsStreaming(true);
+            break;
+          case "agent_end":
+            setIsStreaming(false);
+            break;
+        }
+      });
+
+      agentRef.current = agent;
+
+      if (!mountedRef.current) return;
+      setAgentReady(true);
+      setMessages([
+        {
+          id: generateId(),
+          role: "assistant",
+          content: [{ type: "text", text: "你好！我是小Pi 🥾，你的徒步搭子。今天想去哪走走？你可以拍照让我认认花草，也可以让我讲讲附近的故事。" }],
+          stopReason: "stop",
+          model: "hiking-buddy",
+          usage: { inputTokens: 0, outputTokens: 0 },
+          timestamp: Date.now(),
+        },
+      ]);
+    } catch (err) {
+      if (!mountedRef.current) return;
+      const msg = err instanceof Error ? err.message : String(err);
+      setAgentError(`初始化失败: ${msg}`);
+      console.error("[initAgent] failed:", err);
+    }
   }
 
   const handleSend = useCallback(
     async (text: string) => {
       stopSpeaking();
-      if (!agentRef.current) return;
 
-      // FIX: Show user message in UI immediately
       const userMsg: UserMessage = {
+        id: generateId(),
         role: "user",
         content: [{ type: "text", text }],
         timestamp: Date.now(),
       };
       setMessages((prev) => [...prev, userMsg]);
 
+      if (!agentRef.current) {
+        const tip = agentError
+          ? agentError
+          : "Agent 正在初始化中，请稍等片刻再试。如果持续出现，请在设置中检查 API Key 配置。";
+        const errMsg: AssistantMessage = {
+          id: generateId(),
+          role: "assistant",
+          content: [{ type: "text", text: tip }],
+          stopReason: "error",
+          model: "",
+          usage: { inputTokens: 0, outputTokens: 0 },
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, errMsg]);
+        return;
+      }
+
       try {
         await agentRef.current.prompt(text);
       } catch (err) {
-        Alert.alert("发送失败", err instanceof Error ? err.message : "未知错误");
+        if (!mountedRef.current) return;
+        const errMsg: AssistantMessage = {
+          id: generateId(),
+          role: "assistant",
+          content: [{ type: "text", text: `发送失败: ${err instanceof Error ? err.message : "未知错误"}` }],
+          stopReason: "error",
+          model: "",
+          usage: { inputTokens: 0, outputTokens: 0 },
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, errMsg]);
       }
     },
     [],
@@ -153,11 +209,23 @@ export default function ChatScreen() {
 
   const handlePhoto = useCallback(async () => {
     stopSpeaking();
-    if (!agentRef.current) return;
 
     try {
       const photo = await takePhoto();
       if (!photo) return;
+
+      if (!agentRef.current) return;
+
+      const userMsg: UserMessage = {
+        id: generateId(),
+        role: "user",
+        content: [
+          { type: "text", text: "帮我看看这是什么" },
+          { type: "image", data: photo.base64, mimeType: photo.mimeType },
+        ],
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
 
       await agentRef.current.prompt("帮我看看这是什么", [
         { data: photo.base64, mimeType: photo.mimeType },
@@ -167,12 +235,12 @@ export default function ChatScreen() {
     }
   }, []);
 
-  // Map interactions
   const handleLocationTap = useCallback(
     async (lat: number, lng: number, address: string) => {
       if (!agentRef.current) return;
       const text = `📍 我在 ${address}`;
       const userMsg: UserMessage = {
+        id: generateId(),
         role: "user",
         content: [{ type: "text", text }],
         timestamp: Date.now(),
@@ -193,6 +261,7 @@ export default function ChatScreen() {
       if (!agentRef.current) return;
       const text = `📍 ${poi.name}（${poi.distance}m）`;
       const userMsg: UserMessage = {
+        id: generateId(),
         role: "user",
         content: [{ type: "text", text }],
         timestamp: Date.now(),
@@ -208,73 +277,87 @@ export default function ChatScreen() {
     [],
   );
 
-  // Build renderable data: messages + streaming at the end
-  const renderData = [...messages];
-  if (streamingMessage) {
-    renderData.push(streamingMessage as any);
-  }
-
   const renderItem = useCallback(
-    ({ item, index }: { item: AgentMessage; index: number }) => {
-      // Last item might be the streaming message
-      if (streamingMessage && index === renderData.length - 1) {
-        return <StreamingText message={streamingMessage} />;
-      }
+    ({ item }: { item: AgentMessage }) => {
       return <ChatBubble message={item} />;
     },
-    [streamingMessage, renderData.length],
+    [],
   );
 
+  // FlatList data is committed messages; streaming shown via ListFooterComponent
+  const streamFooter = useCallback(() => {
+    if (!streamingMessage) return null;
+    return <StreamingText message={streamingMessage} />;
+  }, [streamingMessage]);
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <StatusBar style="light" />
-
-      {/* Gradient Header */}
-      <LinearGradient
-        colors={[Colors.primaryDark, Colors.primary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
+    <ErrorBoundary>
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: Colors.bg }]}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <Text style={styles.headerTitle}>徒步搭子</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={() => setTtsEnabled(!ttsEnabled)} style={styles.headerBtn}>
-            <Ionicons name={ttsEnabled ? "volume-high" : "volume-mute"} size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push("/settings")} style={styles.headerBtn}>
-            <Ionicons name="settings-outline" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+        <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* Map Widget */}
-      <MapViewWidget onLocationTap={handleLocationTap} onPOITap={handlePOITap} />
+        {/* Gradient Header */}
+        <LinearGradient
+          colors={[Colors.primaryDark, Colors.primary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}
+        >
+          <Text style={styles.headerTitle}>徒步搭子</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => setTtsEnabled(!ttsEnabled)}
+              style={styles.headerBtn}
+              accessibilityLabel={ttsEnabled ? "关闭语音播报" : "开启语音播报"}
+              accessibilityRole="button"
+            >
+              <Ionicons name={ttsEnabled ? "volume-high" : "volume-mute"} size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/settings")}
+              style={styles.headerBtn}
+              accessibilityLabel="设置"
+              accessibilityRole="button"
+            >
+              <Ionicons name="settings-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
-      {/* Messages */}
-      <FlatList
-        ref={flatListRef}
-        data={renderData}
-        renderItem={renderItem}
-        keyExtractor={(_, i) => String(i)}
-        style={styles.messageList}
-        contentContainerStyle={styles.messageListContent}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        keyboardShouldPersistTaps="handled"
-      />
+        {/* Map Widget */}
+        <MapViewWidget onLocationTap={handleLocationTap} onPOITap={handlePOITap} />
 
-      {/* Input */}
-      <ChatInput onSend={handleSend} onPhoto={handlePhoto} disabled={isStreaming} />
-    </KeyboardAvoidingView>
+        {/* Messages */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          ListFooterComponent={streamFooter}
+          ListFooterComponentStyle={{}}
+          style={[styles.messageList, { backgroundColor: Colors.bg }]}
+          contentContainerStyle={styles.messageListContent}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
+          windowSize={10}
+          maxToRenderPerBatch={5}
+          removeClippedSubviews={true}
+          initialNumToRender={15}
+        />
+
+        {/* Input */}
+        <ChatInput onSend={handleSend} onPhoto={handlePhoto} disabled={isStreaming || !agentReady} />
+      </KeyboardAvoidingView>
+    </ErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.bg,
   },
   header: {
     flexDirection: "row",
@@ -282,7 +365,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md + 2,
-    paddingTop: Spacing.xxl + 10,
     ...Shadows.md,
   },
   headerTitle: {
@@ -305,7 +387,6 @@ const styles = StyleSheet.create({
   },
   messageList: {
     flex: 1,
-    backgroundColor: Colors.bg,
   },
   messageListContent: {
     padding: Spacing.md,
