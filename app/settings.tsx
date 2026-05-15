@@ -8,19 +8,14 @@ import { getApiKey, setApiKey, getBaseUrl, setBaseUrl, getModel, setModel, getAm
 import { useTheme, Spacing, FontSize, Radius, Shadows } from "../src/lib/theme";
 
 const MODEL_OPTIONS = [
-  { label: "GLM-4-Plus", value: "glm-4-plus" },
-  { label: "GLM-4-Flash", value: "glm-4-flash" },
-  { label: "DeepSeek Chat", value: "deepseek-chat" },
-  { label: "GPT-4o", value: "gpt-4o" },
-  { label: "GPT-4o Mini", value: "gpt-4o-mini" },
-  { label: "Claude Sonnet 4", value: "claude-sonnet-4-20250514" },
+  { label: "glm-5.1", value: "glm-5.1" },
 ];
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors: Colors, isDark } = useTheme();
   const [apiKey, setApiKeyState] = useState("");
-  const [baseUrl, setBaseUrlState] = useState("https://open.bigmodel.cn/api/paas/v4");
+  const [baseUrl, setBaseUrlState] = useState("https://open.bigmodel.cn/api/coding/paas/v4");
   const [model, setModelState] = useState(MODEL_OPTIONS[0].value);
   const [amapKey, setAmapKeyState] = useState("");
   const [testing, setTesting] = useState(false);
