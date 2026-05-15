@@ -246,10 +246,15 @@ export class Agent {
       }
 
       // Fallback: if response.body is not a ReadableStream (some Android runtimes),
-      // parse the full response as non-streaming JSON
+      // read the full text and handle both SSE and non-streaming formats
       if (!response.body?.getReader) {
         const text = await response.text();
-        this.parseNonStreamingResponse(text, message);
+        // If response contains SSE lines, parse them; otherwise treat as plain JSON
+        if (text.includes("data: ")) {
+          this.parseSSEText(text, message);
+        } else {
+          this.parseNonStreamingResponse(text, message);
+        }
         return message;
       }
 
@@ -513,6 +518,88 @@ export class Agent {
       } catch {
         // Swallow listener errors
       }
+    }
+  }
+
+  /**
+   * Parse a full SSE text response (fallback for runtimes without ReadableStream).
+   * Extracts content, tool calls, and usage from the concatenated SSE lines.
+   */
+  private parseSSEText(text: string, message: AssistantMessage): void {
+    const toolCallBuffers: Map<number, { id: string; name: string; arguments: string }> = new Map();
+
+    for (const line of text.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data: ")) continue;
+      const data = trimmed.slice(6);
+      if (data === "[DONE]") continue;
+
+      let chunk: ChatChunk;
+      try {
+        chunk = JSON.parse(data);
+      } catch {
+        continue;
+      }
+
+      const delta = chunk.choices?.[0]?.delta;
+
+      // Text content
+      if (delta?.content) {
+        const lastBlock = message.content[message.content.length - 1];
+        if (lastBlock && lastBlock.type === "text") {
+          lastBlock.text += delta.content;
+        } else {
+          message.content.push({ type: "text", text: delta.content });
+        }
+      }
+
+      // Tool calls
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          const idx = tc.index;
+          if (!toolCallBuffers.has(idx)) {
+            toolCallBuffers.set(idx, {
+              id: tc.id || "",
+              name: tc.function?.name || "",
+              arguments: "",
+            });
+          }
+          const buf = toolCallBuffers.get(idx)!;
+          if (tc.id) buf.id = tc.id;
+          if (tc.function?.name) buf.name = tc.function.name;
+          if (tc.function?.arguments) buf.arguments += tc.function.arguments;
+        }
+      }
+
+      // Usage
+      if (chunk.usage) {
+        message.usage = {
+          inputTokens: chunk.usage.prompt_tokens ?? 0,
+          outputTokens: chunk.usage.completion_tokens ?? 0,
+        };
+      }
+
+      // Finish reason
+      const finishReason = chunk.choices?.[0]?.finish_reason;
+      if (finishReason === "tool_calls") {
+        message.stopReason = "toolUse";
+      } else if (finishReason === "length") {
+        message.stopReason = "length";
+      }
+    }
+
+    // Finalize tool calls
+    for (const [, buf] of toolCallBuffers) {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(buf.arguments || "{}");
+      } catch {}
+      message.content.push({
+        type: "toolCall",
+        id: buf.id,
+        name: buf.name,
+        arguments: args,
+      });
     }
   }
 
