@@ -18,7 +18,7 @@ class AmapLocationModule : Module() {
         AsyncFunction("getCurrentPosition") { promise: Promise ->
             val context = appContext.reactContext
                 ?: run {
-                    promise.reject("NO_CONTEXT", "React context not available")
+                    promise.reject("NO_CONTEXT", "React context not available", null)
                     return@AsyncFunction
                 }
 
@@ -45,7 +45,7 @@ class AmapLocationModule : Module() {
                 if (lastLocation != null) {
                     promise.resolve(locationToMap(lastLocation))
                 } else {
-                    promise.reject("NO_PROVIDER", "请开启设备定位服务（GPS）")
+                    promise.reject("NO_PROVIDER", "请开启设备定位服务（GPS）", null)
                 }
                 return@AsyncFunction
             }
@@ -88,7 +88,7 @@ class AmapLocationModule : Module() {
                 if (lastLocation != null) {
                     promise.resolve(locationToMap(lastLocation))
                 } else {
-                    promise.reject("TIMEOUT", "定位超时，请确保在开阔地带并开启GPS")
+                    promise.reject("TIMEOUT", "定位超时，请确保在开阔地带并开启GPS", null)
                 }
             }, 15_000)
         }
