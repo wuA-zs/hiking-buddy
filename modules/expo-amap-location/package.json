@@ -1,5 +1,6 @@
 {
   "name": "expo-amap-location",
   "version": "0.1.0",
-  "description": "Native location module using Android LocationManager (no GMS dependency)"
+  "description": "Native location module using Android LocationManager (no GMS dependency)",
+  "main": "src/index.ts"
 }
