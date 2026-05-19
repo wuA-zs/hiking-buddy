@@ -109,7 +109,8 @@ export interface Skill {
   name: string;
   description: string;
   content: string;
-  filePath: string;
+  source: "bundled" | "user";
+  disableModelInvocation?: boolean;
 }
 
 // ============================================================================

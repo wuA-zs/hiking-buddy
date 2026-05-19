@@ -46,6 +46,7 @@ interface ChatChunk {
 export class Agent {
   private messages: AgentMessage[] = [];
   private tools: Map<string, AgentTool> = new Map();
+  private basePrompt: string;
   private skills: Skill[];
   private systemPrompt: string;
   private baseURL: string;
@@ -61,8 +62,9 @@ export class Agent {
     this.apiKey = config.apiKey;
     this.model = config.model ?? "gpt-4o";
     this.maxTokens = config.maxTokens ?? 4096;
+    this.basePrompt = config.systemPrompt;
     this.skills = config.skills;
-    this.systemPrompt = this.buildSystemPrompt(config.systemPrompt, config.skills);
+    this.systemPrompt = this.buildSystemPrompt(this.basePrompt, config.skills);
     for (const tool of config.tools) {
       this.tools.set(tool.name, tool);
     }
@@ -108,6 +110,17 @@ export class Agent {
   reset(): void {
     this.messages = [];
     this.abort();
+  }
+
+  /** Reload skills and rebuild system prompt. */
+  reloadSkills(skills: Skill[]): void {
+    this.skills = skills;
+    this.systemPrompt = this.buildSystemPrompt(this.basePrompt, skills);
+  }
+
+  /** Get current skills list (for load_skill tool). */
+  getSkills(): Skill[] {
+    return this.skills;
   }
 
   // ── Core Loop ───────────────────────────────────────────────

@@ -16,7 +16,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Agent } from "../src/agent/agent";
 import { loadSkills } from "../src/agent/skills";
+import { skillStore } from "../src/agent/skill-store";
 import { createHikingTools } from "../src/tools/index";
+import type { Skill } from "../src/agent/types";
 import { getApiKey, getBaseUrl, getModel } from "../src/lib/config";
 import { useTheme, Spacing, FontSize, Radius, Shadows } from "../src/lib/theme";
 import { takePhoto } from "../src/services/camera";
@@ -89,7 +91,8 @@ export default function ChatScreen() {
 
       const baseURL = (await getBaseUrl()) || "https://api.openai.com/v1";
       const model = await getModel();
-      const skills = loadSkills({
+      // Load bundled skills
+      const bundledSkills = loadSkills({
         "hiking-guide": hikingGuide,
         "photo-explainer": photoExplainer,
         "location-narrator": locationNarrator,
@@ -98,8 +101,17 @@ export default function ChatScreen() {
         "amap-lbs": amapLbs,
       });
 
-      const tools = createHikingTools();
-      const agent = new Agent({ apiKey, baseURL, model, systemPrompt: SYSTEM_PROMPT, tools, skills });
+      // Load user skills from storage
+      const userSkills = await skillStore.load();
+
+      // Merge: user skills override bundled skills with same name
+      const skillMap = new Map<string, Skill>();
+      for (const s of bundledSkills) skillMap.set(s.name, s);
+      for (const s of userSkills) skillMap.set(s.name, s);
+      const allSkills = Array.from(skillMap.values());
+
+      const tools = createHikingTools(() => agentRef.current?.getSkills() ?? allSkills);
+      const agent = new Agent({ apiKey, baseURL, model, systemPrompt: SYSTEM_PROMPT, tools, skills: allSkills });
 
       agent.subscribe((event: AgentEvent) => {
         if (!mountedRef.current) return;

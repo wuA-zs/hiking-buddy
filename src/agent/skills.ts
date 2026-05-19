@@ -11,7 +11,7 @@ import type { Skill } from "./types";
  * Parse YAML frontmatter from markdown content.
  * Simple parser — only handles flat key-value pairs.
  */
-function parseFrontmatter(raw: string): { frontmatter: Record<string, string>; body: string } {
+export function parseFrontmatter(raw: string): { frontmatter: Record<string, string>; body: string } {
   const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   if (!normalized.startsWith("---")) {
     return { frontmatter: {}, body: normalized };
@@ -43,7 +43,10 @@ function parseFrontmatter(raw: string): { frontmatter: Record<string, string>; b
  * Load skills from a record of name → markdown content.
  * In a mobile app, skills are bundled as static strings rather than files.
  */
-export function loadSkills(skillContents: Record<string, string>): Skill[] {
+export function loadSkills(
+  skillContents: Record<string, string>,
+  source: "bundled" | "user" = "bundled",
+): Skill[] {
   const skills: Skill[] = [];
   for (const [name, content] of Object.entries(skillContents)) {
     const { frontmatter, body } = parseFrontmatter(content);
@@ -51,7 +54,8 @@ export function loadSkills(skillContents: Record<string, string>): Skill[] {
       name: frontmatter.name ?? name,
       description: frontmatter.description ?? "",
       content: body,
-      filePath: `skills://${name}/SKILL.md`,
+      source,
+      disableModelInvocation: frontmatter["disable-model-invocation"] === "true",
     });
   }
   return skills;
@@ -62,33 +66,25 @@ export function loadSkills(skillContents: Record<string, string>): Skill[] {
  * Same format as pi-agent-core harness/system-prompt.ts.
  */
 export function formatSkillsForSystemPrompt(skills: Skill[]): string {
-  if (skills.length === 0) return "";
+  const visible = skills.filter((s) => !s.disableModelInvocation);
+  if (visible.length === 0) return "";
 
   const lines = [
     "",
     "The following skills provide specialized instructions for specific tasks.",
-    "Read the full skill content when the task matches its description.",
+    "当任务匹配某个 skill 的 description 时，调用 load_skill 工具获取完整指令内容。",
     "",
     "<available_skills>",
   ];
 
-  for (const skill of skills) {
+  for (const skill of visible) {
     lines.push("  <skill>");
     lines.push(`    <name>${escapeXml(skill.name)}</name>`);
     lines.push(`    <description>${escapeXml(skill.description)}</description>`);
-    lines.push(`    <location>${escapeXml(skill.filePath)}</location>`);
     lines.push("  </skill>");
   }
 
   lines.push("</available_skills>");
-
-  // Also include full skill content inline (mobile has no file system to read from)
-  for (const skill of skills) {
-    lines.push("");
-    lines.push(`<skill name="${escapeXml(skill.name)}">`);
-    lines.push(skill.content);
-    lines.push("</skill>");
-  }
 
   return lines.join("\n");
 }
