@@ -1,0 +1,67 @@
+npm warn cli npm v11.14.1 does not support Node.js v18.20.8. This version of npm supports the following node versions: `^20.17.0 || >=22.9.0`. You can find the latest version at https://nodejs.org/.
+Error: ENOENT: no such file or directory, open 'D:\code\hiking-buddy\<anonymous>'
+    at Object.openSync (node:fs:596:3)
+    at Object.readFileSync (node:fs:464:35)
+    at getCodeFrame (D:\code\hiking-buddy\node_modules\metro\src\Server.js:997:18)
+    at Server._symbolicate (D:\code\hiking-buddy\node_modules\metro\src\Server.js:1079:22)
+    at Server._processRequest (D:\code\hiking-buddy\node_modules\metro\src\Server.js:460:7) {
+  errno: -4058,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: 'D:\\code\\hiking-buddy\\<anonymous>'
+}
+Error: ENOENT: no such file or directory, open 'D:\code\hiking-buddy\<anonymous>'
+    at Object.openSync (node:fs:596:3)
+    at Object.readFileSync (node:fs:464:35)
+    at getCodeFrame (D:\code\hiking-buddy\node_modules\metro\src\Server.js:997:18)
+    at Server._symbolicate (D:\code\hiking-buddy\node_modules\metro\src\Server.js:1079:22)
+    at Server._processRequest (D:\code\hiking-buddy\node_modules\metro\src\Server.js:460:7) {
+  errno: -4058,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: 'D:\\code\\hiking-buddy\\<anonymous>'
+}
+Error: ENOENT: no such file or directory, open 'D:\code\hiking-buddy\<anonymous>'
+    at Object.openSync (node:fs:596:3)
+    at Object.readFileSync (node:fs:464:35)
+    at getCodeFrame (D:\code\hiking-buddy\node_modules\metro\src\Server.js:997:18)
+    at Server._symbolicate (D:\code\hiking-buddy\node_modules\metro\src\Server.js:1079:22)
+    at Server._processRequest (D:\code\hiking-buddy\node_modules\metro\src\Server.js:460:7) {
+  errno: -4058,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: 'D:\\code\\hiking-buddy\\<anonymous>'
+}
+Error: ENOENT: no such file or directory, open 'D:\code\hiking-buddy\<anonymous>'
+    at Object.openSync (node:fs:596:3)
+    at Object.readFileSync (node:fs:464:35)
+    at getCodeFrame (D:\code\hiking-buddy\node_modules\metro\src\Server.js:997:18)
+    at Server._symbolicate (D:\code\hiking-buddy\node_modules\metro\src\Server.js:1079:22)
+    at Server._processRequest (D:\code\hiking-buddy\node_modules\metro\src\Server.js:460:7) {
+  errno: -4058,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: 'D:\\code\\hiking-buddy\\<anonymous>'
+}
+Error: ENOENT: no such file or directory, open 'D:\code\hiking-buddy\<anonymous>'
+    at Object.openSync (node:fs:596:3)
+    at Object.readFileSync (node:fs:464:35)
+    at getCodeFrame (D:\code\hiking-buddy\node_modules\metro\src\Server.js:997:18)
+    at Server._symbolicate (D:\code\hiking-buddy\node_modules\metro\src\Server.js:1079:22)
+    at Server._processRequest (D:\code\hiking-buddy\node_modules\metro\src\Server.js:460:7) {
+  errno: -4058,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: 'D:\\code\\hiking-buddy\\<anonymous>'
+}
+Error: ENOENT: no such file or directory, open 'D:\code\hiking-buddy\<anonymous>'
+    at Object.openSync (node:fs:596:3)
+    at Object.readFileSync (node:fs:464:35)
+    at getCodeFrame (D:\code\hiking-buddy\node_modules\metro\src\Server.js:997:18)
+    at Server._symbolicate (D:\code\hiking-buddy\node_modules\metro\src\Server.js:1079:22)
+    at Server._processRequest (D:\code\hiking-buddy\node_modules\metro\src\Server.js:460:7) {
+  errno: -4058,
+  syscall: 'open',
+  code: 'ENOENT',
+  path: 'D:\\code\\hiking-buddy\\<anonymous>'
+}

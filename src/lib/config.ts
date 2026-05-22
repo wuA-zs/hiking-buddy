@@ -1,14 +1,11 @@
-/**
- * Configuration management — API key, base URL, model storage
- * Uses expo-secure-store on native, localStorage on web
- */
-
 import { Platform } from "react-native";
 
 const KEY_API_KEY = "llm_api_key";
 const KEY_BASE_URL = "llm_base_url";
 const KEY_MODEL = "llm_model";
 const KEY_AMAP_KEY = "amap_api_key";
+const KEY_PERSONA = "agent_persona";
+const KEY_DISABLED_SKILLS = "disabled_skills";
 
 const DEFAULT_MODEL = "glm-4-flash";
 
@@ -64,4 +61,44 @@ export async function getAmapKey(): Promise<string | null> {
 
 export async function setAmapKey(key: string): Promise<void> {
   await setItem(KEY_AMAP_KEY, key);
+}
+
+export interface AgentPersona {
+  name: string;
+  userAddress: string;
+  personality: string;
+}
+
+export const DEFAULT_PERSONA: AgentPersona = {
+  name: "小 Pi",
+  userAddress: "朋友",
+  personality: "轻松、可靠、像熟悉附近生活的朋友",
+};
+
+export async function getPersona(): Promise<AgentPersona> {
+  const raw = await getItem(KEY_PERSONA);
+  if (!raw) return { ...DEFAULT_PERSONA };
+  try {
+    return { ...DEFAULT_PERSONA, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_PERSONA };
+  }
+}
+
+export async function setPersona(persona: AgentPersona): Promise<void> {
+  await setItem(KEY_PERSONA, JSON.stringify(persona));
+}
+
+export async function getDisabledSkills(): Promise<string[]> {
+  const raw = await getItem(KEY_DISABLED_SKILLS);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export async function setDisabledSkills(names: string[]): Promise<void> {
+  await setItem(KEY_DISABLED_SKILLS, JSON.stringify(names));
 }

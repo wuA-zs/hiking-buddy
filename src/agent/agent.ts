@@ -6,6 +6,7 @@
  */
 
 import type {
+  AGenUIContent,
   AgentConfig,
   AgentEvent,
   AgentMessage,
@@ -13,12 +14,14 @@ import type {
   AgentToolResult,
   AssistantMessage,
   Skill,
+  TextContent,
   ToolCall,
   ToolResultMessage,
   UserMessage,
 } from "./types";
 import { generateId } from "./types";
 import { formatSkillsForSystemPrompt } from "./skills";
+import { formatAGenUIClientCapabilitiesForPrompt } from "../agenui/capabilities";
 
 type EventListener = (event: AgentEvent) => void;
 
@@ -42,6 +45,11 @@ interface ChatChunk {
   }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
+
+type AssistantContent = AssistantMessage["content"][number];
+
+const AGENUI_FENCE_RE = /```agenui(?:\s+json)?\s*\n?([\s\S]*?)```/gi;
+const JSON_FENCE_RE = /```json\s*\n?([\s\S]*?)```/gi;
 
 export class Agent {
   private messages: AgentMessage[] = [];
@@ -174,6 +182,7 @@ export class Agent {
       const content = json.choices?.[0]?.message?.content;
       if (content) {
         message.content = [{ type: "text", text: content }];
+        this.normalizeAGenUIContent(message);
       }
       const finishReason = json.choices?.[0]?.finish_reason;
       if (finishReason === "tool_calls") {
@@ -201,6 +210,7 @@ export class Agent {
           outputTokens: json.usage.completion_tokens ?? 0,
         };
       }
+      this.normalizeAGenUIContent(message);
     } catch {
       message.stopReason = "error";
       message.content = [{ type: "text", text: `解析响应失败: ${text.slice(0, 200)}` }];
@@ -351,6 +361,7 @@ export class Agent {
       }
 
       // Finalize tool calls
+      this.normalizeAGenUIContent(message);
       for (const [, buf] of toolCallBuffers) {
         let args: Record<string, unknown> = {};
         try {
@@ -476,10 +487,12 @@ export class Agent {
           });
         }
       } else if (msg.role === "assistant") {
-        const content: string | null = msg.content
+        const textContent = msg.content
           .filter((c) => c.type === "text")
           .map((c) => c.text)
-          .join("") || null;
+          .join("");
+        const hasAGenUI = msg.content.some((c) => c.type === "agenui");
+        const content: string | null = textContent || (hasAGenUI ? "[AGenUI content rendered]" : null);
 
         const toolCalls = msg.content
           .filter((c) => c.type === "toolCall")
@@ -523,6 +536,118 @@ export class Agent {
   }
 
   // ── Helpers ─────────────────────────────────────────────────
+
+  private normalizeAGenUIContent(message: AssistantMessage): void {
+    const normalized: AssistantContent[] = [];
+    let changed = false;
+
+    for (const content of message.content) {
+      if (content.type !== "text") {
+        normalized.push(content);
+        continue;
+      }
+
+      const pieces = this.splitAGenUIBlocks(content.text);
+      if (pieces.length === 1 && pieces[0].type === "text" && pieces[0].text === content.text) {
+        normalized.push(content);
+        continue;
+      }
+
+      changed = true;
+      normalized.push(...pieces);
+    }
+
+    if (changed) {
+      message.content = normalized;
+    }
+  }
+
+  private splitAGenUIBlocks(text: string): (TextContent | AGenUIContent)[] {
+    const wholePayload = this.extractAGenUIPayload(text);
+    if (wholePayload) {
+      return [{ type: "agenui", id: generateId(), payload: wholePayload }];
+    }
+
+    const agenuiPieces = this.splitFencedAGenUIBlocks(text, AGENUI_FENCE_RE, true);
+    if (agenuiPieces) return agenuiPieces;
+
+    return this.splitFencedAGenUIBlocks(text, JSON_FENCE_RE, false) ?? [{ type: "text", text }];
+  }
+
+  private splitFencedAGenUIBlocks(
+    text: string,
+    pattern: RegExp,
+    trustFenceLanguage: boolean,
+  ): (TextContent | AGenUIContent)[] | null {
+    pattern.lastIndex = 0;
+    const pieces: (TextContent | AGenUIContent)[] = [];
+    let lastIndex = 0;
+    let changed = false;
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(text)) !== null) {
+      const rawPayload = match[1]?.trim() ?? "";
+      const payload = trustFenceLanguage ? this.normalizeAGenUIPayload(rawPayload) : this.extractAGenUIPayload(rawPayload);
+      if (!payload) continue;
+
+      if (match.index > lastIndex) {
+        pieces.push({ type: "text", text: text.slice(lastIndex, match.index) });
+      }
+      pieces.push({ type: "agenui", id: generateId(), payload });
+      lastIndex = match.index + match[0].length;
+      changed = true;
+    }
+
+    if (!changed) return null;
+    if (lastIndex < text.length) {
+      pieces.push({ type: "text", text: text.slice(lastIndex) });
+    }
+    return pieces.filter((piece) => piece.type !== "text" || piece.text.length > 0);
+  }
+
+  private extractAGenUIPayload(text: string): string | null {
+    try {
+      const trimmed = text.trim();
+      const parsed = JSON.parse(trimmed);
+      if (this.isAGenUIWrapper(parsed)) {
+        return this.normalizeAGenUIPayload(trimmed);
+      }
+      return this.looksLikeAGenUI(parsed) ? trimmed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizeAGenUIPayload(payload: string): string | null {
+    try {
+      const parsed = JSON.parse(payload);
+      if (this.isAGenUIWrapper(parsed)) {
+        const innerPayload = parsed.payload;
+        const normalizedPayload = typeof innerPayload === "string" ? innerPayload : JSON.stringify(innerPayload);
+        return this.extractAGenUIPayload(normalizedPayload);
+      }
+      return this.looksLikeAGenUI(parsed) ? payload : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private looksLikeAGenUI(value: unknown): boolean {
+    if (Array.isArray(value)) {
+      return value.length > 0 && value.every((item) => this.looksLikeAGenUI(item));
+    }
+    if (!this.isRecord(value)) return false;
+
+    return "createSurface" in value || "updateComponents" in value || "updateDataModel" in value || "deleteSurface" in value;
+  }
+
+  private isAGenUIWrapper(value: unknown): value is { type: "agenui"; payload: unknown } {
+    return this.isRecord(value) && value.type === "agenui" && "payload" in value;
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+  }
 
   private async emit(event: AgentEvent): Promise<void> {
     for (const listener of this.listeners) {
@@ -602,6 +727,7 @@ export class Agent {
     }
 
     // Finalize tool calls
+    this.normalizeAGenUIContent(message);
     for (const [, buf] of toolCallBuffers) {
       let args: Record<string, unknown> = {};
       try {
@@ -618,11 +744,14 @@ export class Agent {
 
   private buildSystemPrompt(basePrompt: string, skills: Skill[]): string {
     const skillSection = formatSkillsForSystemPrompt(skills);
+    const agenUISection = skills.some((skill) => skill.name === "a2ui-generation")
+      ? `\n\n${formatAGenUIClientCapabilitiesForPrompt()}`
+      : "";
     const date = new Date().toLocaleDateString("zh-CN", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     });
-    return `${basePrompt}\n\n${skillSection}\n\n当前日期: ${date}`;
+    return `${basePrompt}\n\n${skillSection}${agenUISection}\n\n当前日期: ${date}`;
   }
 }

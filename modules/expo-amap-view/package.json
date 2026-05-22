@@ -1,0 +1,6 @@
+{
+  "name": "expo-amap-view",
+  "version": "0.1.0",
+  "description": "Native AMap MapView component for React Native (no Google Play Services dependency)",
+  "main": "src/index.ts"
+}

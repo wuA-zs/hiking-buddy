@@ -18,6 +18,25 @@ export interface Position {
 
 let locationSubscription: ExpoLocation.LocationSubscription | null = null;
 
+// Lazy-load native module — survives require() failures gracefully
+let _nativeModule: any | null | undefined;
+function getNativeModule() {
+  if (_nativeModule === undefined) {
+    try {
+      // requireNativeModule is called lazily inside getNativePosition(),
+      // so this require() succeeds even if the native side is missing.
+      // We verify availability by checking requireNativeModule directly.
+      const { requireNativeModule } = require("expo-modules-core");
+      requireNativeModule("ExpoAmapLocation");
+      _nativeModule = require("../../modules/expo-amap-location/src");
+    } catch (e) {
+      console.warn("[location] Native module NOT available:", e);
+      _nativeModule = null;
+    }
+  }
+  return _nativeModule;
+}
+
 export async function requestPermission(): Promise<boolean> {
   const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
   return status === "granted";
@@ -25,10 +44,10 @@ export async function requestPermission(): Promise<boolean> {
 
 export async function getCurrentPosition(): Promise<Position> {
   if (Platform.OS === "android") {
-    // Use native LocationManager — works without Google Play Services
-    try {
-      const { getNativePosition } = require("../../modules/expo-amap-location/src");
-      const pos = await getNativePosition();
+    const native = getNativeModule();
+    if (native) {
+      // Use native LocationManager — works without Google Play Services
+      const pos = await native.getNativePosition();
       const [gcjLat, gcjLng] = wgs84ToGcj02(pos.latitude, pos.longitude);
       return {
         latitude: gcjLat,
@@ -39,12 +58,12 @@ export async function getCurrentPosition(): Promise<Position> {
         heading: pos.heading,
         timestamp: pos.timestamp,
       };
-    } catch {
-      // Fallback to expo-location if native module fails
     }
+    // Native module unavailable — throw clear error instead of falling back to GMS
+    throw new Error("定位模块未加载，请使用开发版构建(development build)安装");
   }
 
-  // iOS / fallback: use expo-location
+  // iOS / web: use expo-location
   const loc = await ExpoLocation.getCurrentPositionAsync({
     accuracy: ExpoLocation.Accuracy.Balanced,
   });
@@ -67,13 +86,12 @@ export async function startWatching(
   await requestPermission();
 
   if (Platform.OS === "android") {
-    // For Android watching, use expo-location if available, otherwise poll native module
-    try {
-      const { getNativePosition } = require("../../modules/expo-amap-location/src");
+    const native = getNativeModule();
+    if (native) {
       // Poll-based watching for native module
       const watchInterval = setInterval(async () => {
         try {
-          const pos = await getNativePosition();
+          const pos = await native.getNativePosition();
           const [gcjLat, gcjLng] = wgs84ToGcj02(pos.latitude, pos.longitude);
           callback({
             latitude: gcjLat,
@@ -88,12 +106,10 @@ export async function startWatching(
           // Ignore individual poll failures
         }
       }, 5000);
-      // Store interval for cleanup
       locationSubscription = { remove: () => clearInterval(watchInterval) } as any;
       return;
-    } catch {
-      // Fall through to expo-location
     }
+    throw new Error("定位模块未加载，请使用开发版构建(development build)安装");
   }
 
   locationSubscription = await ExpoLocation.watchPositionAsync(

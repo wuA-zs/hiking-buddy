@@ -1,30 +1,28 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { useTheme, Spacing, FontSize, Radius, Shadows, getToolCallLabel } from "../lib/theme";
+import { useTheme, Spacing, FontSize, Radius, getToolCallLabel } from "../lib/theme";
 import type { ToolCall } from "../agent/types";
+import { AppIcon } from "./AppIcon";
 
 interface Props {
   children?: React.ReactNode;
   toolCalls?: ToolCall[];
 }
 
-/**
- * Shared assistant bubble layout — avatar + bubble with optional tool calls.
- * Used by both ChatBubble and StreamingText to avoid style duplication.
- */
 export function AssistantBubble({ children, toolCalls }: Props) {
   const { colors: Colors } = useTheme();
 
   return (
     <View style={styles.row}>
-      <View style={[styles.avatar, { backgroundColor: Colors.primaryAlpha20 }]}>
-        <Text style={[styles.avatarText, { color: Colors.primary }]}>Pi</Text>
+      <View style={[styles.avatar, { backgroundColor: Colors.primaryAlpha12 }]}>
+        <AppIcon name="leaf-outline" size={16} color={Colors.primary} />
       </View>
       <View style={styles.content}>
         <View style={[styles.bubble, { backgroundColor: Colors.bubbleAssistant, borderColor: Colors.bubbleAssistantBorder }]}>
           {children}
           {toolCalls?.map((tc) => (
             <View key={tc.id} style={[styles.toolCall, { backgroundColor: Colors.toolCallBg, borderColor: Colors.toolCallBorder }]}>
+              <AppIcon name="sparkles-outline" size={13} color={Colors.primary} />
               <Text style={[styles.toolCallText, { color: Colors.primary }]}>{getToolCallLabel(tc.name)}</Text>
             </View>
           ))}
@@ -40,21 +38,17 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     alignItems: "flex-start",
     marginVertical: Spacing.xs,
-    maxWidth: "88%",
+    maxWidth: "90%",
     paddingHorizontal: Spacing.md,
   },
   avatar: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderRadius: Radius.full,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.sm,
     marginTop: 2,
-  },
-  avatarText: {
-    fontSize: FontSize.xs,
-    fontWeight: "700",
   },
   content: {
     flex: 1,
@@ -63,19 +57,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderRadius: Radius.lg,
-    borderBottomLeftRadius: Spacing.xs,
+    borderBottomLeftRadius: Radius.sm,
     borderWidth: 1,
-    ...Shadows.sm,
   },
   toolCall: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     marginTop: Spacing.sm,
+    gap: Spacing.xs,
   },
   toolCallText: {
-    fontSize: FontSize.sm,
-    fontWeight: "500",
+    fontSize: FontSize.xs,
+    fontWeight: "600",
   },
 });

@@ -5,13 +5,18 @@ export function createLoadSkillTool(getSkills: () => Skill[]): AgentTool {
     name: "load_skill",
     label: "加载技能",
     description:
-      "按名称加载 skill 的完整指令内容。当用户任务匹配某个 skill 的描述时调用此工具获取详细指令。",
+      "按名称加载 skill 的完整指令内容。支持加载子文档（如 'a2ui-generation' 的 'docs/component-catalog.md'）。当用户任务匹配某个 skill 的描述时调用此工具获取详细指令。",
     parameters: {
       type: "object",
       properties: {
         name: {
           type: "string",
-          description: "要加载的 skill 名称，如 'hiking-guide'、'photo-explainer'",
+          description: "要加载的 skill 名称，如 'hiking-guide'、'a2ui-generation'",
+        },
+        doc: {
+          type: "string",
+          description:
+            "可选。要加载的子文档相对路径，如 'docs/component-catalog.md'、'reference.md'。不传则返回主 SKILL.md 内容。",
         },
       },
       required: ["name"],
@@ -25,8 +30,37 @@ export function createLoadSkillTool(getSkills: () => Skill[]): AgentTool {
           content: [{ type: "text" as const, text: `未找到 skill: ${params.name}。可用的 skill: ${available}` }],
         };
       }
+
+      // If doc is specified, load a sub-document
+      if (params.doc && typeof params.doc === "string") {
+        const docContent = skill.docs?.[params.doc];
+        if (!docContent) {
+          const availableDocs = Object.keys(skill.docs ?? {});
+          if (availableDocs.length === 0) {
+            return {
+              content: [{ type: "text" as const, text: `Skill '${params.name}' 没有子文档。直接使用主内容即可。` }],
+            };
+          }
+          return {
+            content: [{
+              type: "text" as const,
+              text: `未找到子文档: ${params.doc}。可用的子文档:\n${availableDocs.map((d) => `- ${d}`).join("\n")}`,
+            }],
+          };
+        }
+        return {
+          content: [{ type: "text" as const, text: docContent }],
+        };
+      }
+
+      // No doc specified — return main content + list available docs
+      const availableDocs = Object.keys(skill.docs ?? {});
+      let text = skill.content;
+      if (availableDocs.length > 0) {
+        text += `\n\n---\n\n## 可用的子文档\n使用 load_skill(name="${params.name}", doc="...") 加载：\n${availableDocs.map((d) => `- \`${d}\``).join("\n")}`;
+      }
       return {
-        content: [{ type: "text" as const, text: skill.content }],
+        content: [{ type: "text" as const, text }],
       };
     },
   };

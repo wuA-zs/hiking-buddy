@@ -1,8 +1,7 @@
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
-
-def safeExtGet(prop, fallback) {
-  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+plugins {
+  id 'com.android.library'
+  id 'kotlin-android'
+  id 'expo-module-gradle-plugin'
 }
 
 group = 'expo.modules.amaplocation'
@@ -10,11 +9,9 @@ version = '0.1.0'
 
 android {
   namespace "expo.modules.amaplocation"
-  compileSdkVersion safeExtGet("compileSdkVersion", 35)
-
   defaultConfig {
-    minSdkVersion safeExtGet("minSdkVersion", 24)
-    targetSdkVersion safeExtGet("targetSdkVersion", 35)
+    versionCode 1
+    versionName "0.1.0"
   }
 
   compileOptions {
@@ -29,11 +26,6 @@ android {
   lintOptions {
     abortOnError false
   }
-}
-
-repositories {
-  google()
-  mavenCentral()
 }
 
 dependencies {

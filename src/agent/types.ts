@@ -25,6 +25,12 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
 }
 
+export interface AGenUIContent {
+  type: "agenui";
+  id: string;
+  payload: string;
+}
+
 export interface UserMessage {
   id: string;
   role: "user";
@@ -35,7 +41,7 @@ export interface UserMessage {
 export interface AssistantMessage {
   id: string;
   role: "assistant";
-  content: (TextContent | ToolCall)[];
+  content: (TextContent | ToolCall | AGenUIContent)[];
   stopReason: "stop" | "toolUse" | "error" | "aborted" | "length";
   errorMessage?: string;
   model: string;
@@ -109,6 +115,7 @@ export interface Skill {
   name: string;
   description: string;
   content: string;
+  docs?: Record<string, string>;
   source: "bundled" | "user";
   disableModelInvocation?: boolean;
 }

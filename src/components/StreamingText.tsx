@@ -1,14 +1,17 @@
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
 import type { AssistantMessage } from "../agent/types";
+import type { AGenUIActionEvent } from "expo-agenui";
 import { useTheme, Spacing, FontSize } from "../lib/theme";
 import { AssistantBubble } from "./AssistantBubble";
+import { AGenUIBubble } from "./AGenUIBubble";
 
 interface Props {
   message: AssistantMessage | undefined;
+  onAGenUIAction?: (event: AGenUIActionEvent) => void;
 }
 
-export function StreamingText({ message }: Props) {
+export function StreamingText({ message, onAGenUIAction }: Props) {
   const { colors: Colors } = useTheme();
   const cursorOpacity = useRef(new Animated.Value(1)).current;
 
@@ -34,12 +37,20 @@ export function StreamingText({ message }: Props) {
 
   return (
     <AssistantBubble toolCalls={toolCalls}>
-      {text ? (
-        <View style={styles.textRow}>
-          <Text style={[styles.assistantText, { color: Colors.textPrimary }]}>{text}</Text>
-          <Animated.Text style={[styles.cursor, { opacity: cursorOpacity, color: Colors.primary }]}>|</Animated.Text>
-        </View>
-      ) : null}
+      {message.content.map((content, index) => {
+        if (content.type === "text") {
+          return content.text ? (
+            <View key={`${message.id}-text-${index}`} style={styles.textRow}>
+              <Text style={[styles.assistantText, { color: Colors.textPrimary }]}>{content.text}</Text>
+              <Animated.Text style={[styles.cursor, { opacity: cursorOpacity, color: Colors.primary }]}>|</Animated.Text>
+            </View>
+          ) : null;
+        }
+        if (content.type === "agenui") {
+          return <AGenUIBubble key={content.id} content={content} onAction={onAGenUIAction} />;
+        }
+        return null;
+      })}
     </AssistantBubble>
   );
 }

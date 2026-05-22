@@ -1,15 +1,17 @@
 import React from "react";
 import { View, Text, StyleSheet, Image } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import type { AgentMessage } from "../agent/types";
-import { useTheme, Spacing, FontSize, Radius, Shadows, formatTime } from "../lib/theme";
+import type { AGenUIActionEvent } from "expo-agenui";
+import { useTheme, Spacing, FontSize, Radius, formatTime } from "../lib/theme";
 import { AssistantBubble } from "./AssistantBubble";
+import { AGenUIBubble } from "./AGenUIBubble";
 
 interface Props {
   message: AgentMessage;
+  onAGenUIAction?: (event: AGenUIActionEvent) => void;
 }
 
-export function ChatBubble({ message }: Props) {
+export function ChatBubble({ message, onAGenUIAction }: Props) {
   const { colors: Colors } = useTheme();
 
   if (message.role === "user") {
@@ -20,24 +22,19 @@ export function ChatBubble({ message }: Props) {
     const images = message.content.filter((c): c is { type: "image"; data: string; mimeType: string } => c.type === "image");
 
     return (
-      <View style={styles.userRow} accessibilityLabel={`你说: ${text}`}>
-        <LinearGradient
-          colors={Colors.bubbleUserGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.userBubble, images.length > 0 && styles.userBubbleWithImage]}
-        >
+      <View style={styles.userRow} accessibilityLabel={`你说：${text}`}>
+        <View style={[styles.userBubble, { backgroundColor: Colors.bubbleUser }, images.length > 0 && styles.userBubbleWithImage]}>
           {images.map((img, i) => (
             <Image
               key={i}
               source={{ uri: `data:${img.mimeType};base64,${img.data}` }}
               style={styles.userImage}
               resizeMode="cover"
-              accessibilityLabel="拍摄的照片"
+              accessibilityLabel="你拍摄的照片"
             />
           ))}
           {text ? <Text style={[styles.userText, { color: Colors.textOnPrimary }]}>{text}</Text> : null}
-        </LinearGradient>
+        </View>
         <Text style={[styles.timeUser, { color: Colors.textTertiary }]}>{formatTime(message.timestamp)}</Text>
       </View>
     );
@@ -51,9 +48,21 @@ export function ChatBubble({ message }: Props) {
     const toolCalls = message.content.filter((c) => c.type === "toolCall");
 
     return (
-      <View accessibilityLabel={`小Pi说: ${text}`}>
+      <View accessibilityLabel={`走走搭子说：${text}`}>
         <AssistantBubble toolCalls={toolCalls}>
-          {text ? <Text style={[styles.assistantText, { color: Colors.textPrimary }]}>{text}</Text> : null}
+          {message.content.map((content, index) => {
+            if (content.type === "text") {
+              return content.text ? (
+                <Text key={`${message.id}-text-${index}`} style={[styles.assistantText, { color: Colors.textPrimary }]}>
+                  {content.text}
+                </Text>
+              ) : null;
+            }
+            if (content.type === "agenui") {
+              return <AGenUIBubble key={content.id} content={content} onAction={onAGenUIAction} />;
+            }
+            return null;
+          })}
         </AssistantBubble>
         <Text style={[styles.timeAssistant, { color: Colors.textTertiary }]}>{formatTime(message.timestamp)}</Text>
       </View>
@@ -75,25 +84,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderRadius: Radius.lg,
-    borderBottomRightRadius: Spacing.xs,
-    ...Shadows.sm,
+    borderBottomRightRadius: Radius.sm,
   },
   userBubbleWithImage: {
     padding: Spacing.xs,
   },
   userImage: {
-    width: 180,
-    height: 180,
+    width: 184,
+    height: 184,
     borderRadius: Radius.md,
     marginBottom: Spacing.sm,
   },
   userText: {
     fontSize: FontSize.md,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   assistantText: {
     fontSize: FontSize.md,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   timeUser: {
     fontSize: FontSize.xs,
@@ -103,6 +111,6 @@ const styles = StyleSheet.create({
   timeAssistant: {
     fontSize: FontSize.xs,
     marginTop: 2,
-    marginLeft: Spacing.xl + Spacing.md + Spacing.sm,
+    marginLeft: 50,
   },
 });

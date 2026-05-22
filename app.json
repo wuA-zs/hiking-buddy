@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "徒步搭子",
+    "name": "走走搭子",
     "slug": "hiking-buddy",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -18,15 +18,15 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.hikingbuddy.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "需要获取你的位置来提供导游讲解",
-        "NSCameraUsageDescription": "需要拍照来识别花草和风景",
-        "NSMicrophoneUsageDescription": "需要麦克风来语音对话"
+        "NSLocationWhenInUseUsageDescription": "需要获取你的位置，用来推荐附近适合走走的地方和路线。",
+        "NSCameraUsageDescription": "需要使用相机，用来识别和讲解你路上看到的内容。",
+        "NSMicrophoneUsageDescription": "需要使用麦克风，用来支持语音对话。"
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#2d6a4f"
+        "backgroundColor": "#2f6f4e"
       },
       "package": "com.hikingbuddy.app",
       "permissions": [
@@ -41,13 +41,13 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "需要获取你的位置来提供导游讲解"
+          "locationWhenInUsePermission": "需要获取你的位置，用来推荐附近适合走走的地方和路线。"
         }
       ],
       [
         "expo-image-picker",
         {
-          "cameraPermission": "需要拍照来识别花草和风景"
+          "cameraPermission": "需要使用相机，用来识别和讲解你路上看到的内容。"
         }
       ],
       "expo-secure-store",

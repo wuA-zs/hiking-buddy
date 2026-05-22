@@ -41,19 +41,34 @@ export function parseFrontmatter(raw: string): { frontmatter: Record<string, str
 
 /**
  * Load skills from a record of name → markdown content.
- * In a mobile app, skills are bundled as static strings rather than files.
+ * Optionally pass bundled docs for multi-file skills.
  */
 export function loadSkills(
   skillContents: Record<string, string>,
   source: "bundled" | "user" = "bundled",
+  skillDocs?: Record<string, string>,
 ): Skill[] {
   const skills: Skill[] = [];
   for (const [name, content] of Object.entries(skillContents)) {
     const { frontmatter, body } = parseFrontmatter(content);
+
+    // Collect docs for this skill from bundledSkillDocs
+    const docs: Record<string, string> = {};
+    if (skillDocs) {
+      const prefix = `${name}/`;
+      for (const [docKey, docContent] of Object.entries(skillDocs)) {
+        if (docKey.startsWith(prefix)) {
+          const relPath = docKey.slice(prefix.length);
+          docs[relPath] = docContent;
+        }
+      }
+    }
+
     skills.push({
       name: frontmatter.name ?? name,
       description: frontmatter.description ?? "",
       content: body,
+      docs: Object.keys(docs).length > 0 ? docs : undefined,
       source,
       disableModelInvocation: frontmatter["disable-model-invocation"] === "true",
     });

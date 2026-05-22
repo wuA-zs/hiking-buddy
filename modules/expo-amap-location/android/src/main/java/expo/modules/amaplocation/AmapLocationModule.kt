@@ -7,11 +7,14 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 class AmapLocationModule : Module() {
+    private val TAG = "ExpoAmapLocation"
+
     override fun definition() = ModuleDefinition {
         Name("ExpoAmapLocation")
 
@@ -27,8 +30,11 @@ class AmapLocationModule : Module() {
             val gpsEnabled = try { locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) } catch (_: Exception) { false }
             val networkEnabled = try { locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) } catch (_: Exception) { false }
 
+            Log.d(TAG, "GPS enabled=$gpsEnabled, Network enabled=$networkEnabled")
+
             // Get last known location for quick response
             val lastLocation = getLastKnownLocation(locationManager)
+            Log.d(TAG, "Last known location: ${lastLocation?.latitude},${lastLocation?.longitude} age=${lastLocation?.let { System.currentTimeMillis() - it.time }}ms")
 
             // If last location is recent (<30s), use it directly
             if (lastLocation != null && (System.currentTimeMillis() - lastLocation.time) < 30_000) {
@@ -71,8 +77,9 @@ class AmapLocationModule : Module() {
             for (provider in providers) {
                 try {
                     locationManager.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper())
-                } catch (_: SecurityException) {
-                    // Permission not granted, skip
+                    Log.d(TAG, "Requested updates from $provider")
+                } catch (e: SecurityException) {
+                    Log.w(TAG, "No permission for $provider: ${e.message}")
                 }
             }
 
@@ -88,6 +95,7 @@ class AmapLocationModule : Module() {
                 if (lastLocation != null) {
                     promise.resolve(locationToMap(lastLocation))
                 } else {
+                    Log.w(TAG, "Location timeout — no providers responded within 15s")
                     promise.reject("TIMEOUT", "定位超时，请确保在开阔地带并开启GPS", null)
                 }
             }, 15_000)

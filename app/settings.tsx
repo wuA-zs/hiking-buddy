@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getApiKey, setApiKey, getBaseUrl, setBaseUrl, getModel, setModel, getAmapKey, setAmapKey } from "../src/lib/config";
 import { useTheme, Spacing, FontSize, Radius, Shadows } from "../src/lib/theme";
+import { AppIcon } from "../src/components/AppIcon";
 
 const MODEL_OPTIONS = [
   { label: "glm-5.1", value: "glm-5.1" },
@@ -129,7 +129,7 @@ export default function SettingsScreen() {
         {/* Base URL */}
         <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginBottom: Spacing.xs }}>
-            <Ionicons name="globe-outline" size={18} color={Colors.primary} />
+            <AppIcon name="globe-outline" size={18} color={Colors.primary} />
             <Text style={{ fontSize: FontSize.lg, fontWeight: "600", color: Colors.textPrimary }}>Base URL</Text>
           </View>
           <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, marginBottom: Spacing.md }}>OpenAI 兼容 API 地址</Text>
@@ -149,7 +149,7 @@ export default function SettingsScreen() {
         {/* API Key */}
         <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginBottom: Spacing.xs }}>
-            <Ionicons name="key-outline" size={18} color={Colors.primary} />
+            <AppIcon name="key-outline" size={18} color={Colors.primary} />
             <Text style={{ fontSize: FontSize.lg, fontWeight: "600", color: Colors.textPrimary }}>API Key</Text>
           </View>
           <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, marginBottom: Spacing.md }}>必填，用于 LLM 对话</Text>
@@ -169,7 +169,7 @@ export default function SettingsScreen() {
         {/* Model */}
         <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginBottom: Spacing.xs }}>
-            <Ionicons name="hardware-chip-outline" size={18} color={Colors.primary} />
+            <AppIcon name="hardware-chip-outline" size={18} color={Colors.primary} />
             <Text style={{ fontSize: FontSize.lg, fontWeight: "600", color: Colors.textPrimary }}>模型</Text>
           </View>
           <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, marginBottom: Spacing.md }}>选择对话使用的模型</Text>
@@ -207,7 +207,7 @@ export default function SettingsScreen() {
         {/* Amap Key */}
         <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.sm }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginBottom: Spacing.xs }}>
-            <Ionicons name="map-outline" size={18} color={Colors.primary} />
+            <AppIcon name="map-outline" size={18} color={Colors.primary} />
             <Text style={{ fontSize: FontSize.lg, fontWeight: "600", color: Colors.textPrimary }}>高德地图 Key</Text>
           </View>
           <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, marginBottom: Spacing.md }}>可选，用于逆地理编码和附近搜索</Text>
@@ -232,7 +232,7 @@ export default function SettingsScreen() {
             {testing ? (
               <ActivityIndicator size="small" color={Colors.primary} />
             ) : (
-              <Ionicons name="flash-outline" size={18} color={Colors.primary} />
+              <AppIcon name="flash-outline" size={18} color={Colors.primary} />
             )}
             <Text style={{ color: Colors.primary, fontSize: FontSize.md, fontWeight: "600" }}>测试连通</Text>
           </TouchableOpacity>
@@ -241,7 +241,7 @@ export default function SettingsScreen() {
             style={{ flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: Spacing.xs, borderRadius: Radius.lg, padding: Spacing.md + 2, backgroundColor: Colors.primary, ...Shadows.md }}
             onPress={handleSave}
           >
-            <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+            <AppIcon name="checkmark-circle-outline" size={18} color="#fff" />
             <Text style={{ color: "#fff", fontSize: FontSize.md, fontWeight: "600" }}>保存配置</Text>
           </TouchableOpacity>
         </View>
@@ -249,7 +249,7 @@ export default function SettingsScreen() {
         {/* About */}
         <View style={{ marginTop: Spacing.xxxl, paddingTop: Spacing.xl, borderTopWidth: 1, borderTopColor: Colors.divider }}>
           <Text style={{ fontSize: FontSize.sm, fontWeight: "600", color: Colors.textSecondary, marginBottom: Spacing.sm }}>关于</Text>
-          <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, lineHeight: 20 }}>徒步搭子 — 你的 AI 徒步向导</Text>
+          <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, lineHeight: 20 }}>走走搭子 — 陪你日常出去走走的 AI 搭子</Text>
           <Text style={{ fontSize: FontSize.sm, color: Colors.textTertiary, lineHeight: 20 }}>基于 pi-agent-core 架构，使用 AI 驱动</Text>
         </View>
       </ScrollView>

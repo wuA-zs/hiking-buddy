@@ -1,89 +1,78 @@
-/**
- * Shared theme — colors, spacing, typography, helpers
- * Supports light and dark mode via useTheme() hook.
- */
-
 import { useColorScheme } from "react-native";
 
-// ── Color Palettes ────────────────────────────────────────────
-
 const LightColors = {
-  // Primary (forest green gradient)
-  primary: "#2d6a4f",
-  primaryDark: "#1b4332",
-  primaryLight: "#52b788",
-  primaryAlpha20: "rgba(45,106,79,0.20)",
+  primary: "#2f6f4e",
+  primaryDark: "#214d39",
+  primaryLight: "#79b58a",
+  primaryAlpha12: "rgba(47,111,78,0.12)",
+  primaryAlpha20: "rgba(47,111,78,0.20)",
 
-  // Backgrounds
-  bg: "#f8faf8",
+  bg: "#f6f7f2",
   surface: "#ffffff",
-  surfaceAlt: "#f0f4f0",
+  surfaceAlt: "#edf2e9",
+  elevated: "#fbfcf8",
 
-  // Text
-  textPrimary: "#1a1a1a",
-  textSecondary: "#4a5568",
-  textTertiary: "#94a3b8",
+  textPrimary: "#17201a",
+  textSecondary: "#556156",
+  textTertiary: "#8a958d",
   textOnPrimary: "#ffffff",
-  textOnSurface: "#333333",
+  textOnSurface: "#263128",
 
-  // Borders & dividers
-  border: "#e2e8e0",
-  divider: "#f0f0f0",
+  border: "#dde6da",
+  divider: "#e8ede5",
 
-  // Semantic
-  error: "#dc2626",
-  warning: "#f59e0b",
-  info: "#3b82f6",
+  error: "#c2413b",
+  warning: "#b7791f",
+  info: "#3574a6",
 
-  // Chat
-  bubbleUser: "#2d6a4f",
-  bubbleUserGradient: ["#1b4332", "#2d6a4f"] as [string, string],
+  bubbleUser: "#2f6f4e",
+  bubbleUserGradient: ["#2f6f4e", "#3f8060"] as [string, string],
   bubbleAssistant: "#ffffff",
-  bubbleAssistantBorder: "#e8f0e8",
-  toolCallBg: "#f0f7f4",
-  toolCallBorder: "#b7e4c7",
+  bubbleAssistantBorder: "#e1eadf",
+  toolCallBg: "#eef6ec",
+  toolCallBorder: "#c9dec5",
 
-  // Map
-  mapExpandBg: "#e8f5ee",
+  mapExpandBg: "#edf5ea",
+  inputBg: "#f1f4ee",
 };
 
 const DarkColors = {
-  primary: "#52b788",
-  primaryDark: "#2d6a4f",
-  primaryLight: "#74c69d",
-  primaryAlpha20: "rgba(82,183,136,0.25)",
+  primary: "#8bcf9f",
+  primaryDark: "#355f45",
+  primaryLight: "#a6dcaf",
+  primaryAlpha12: "rgba(139,207,159,0.12)",
+  primaryAlpha20: "rgba(139,207,159,0.22)",
 
-  bg: "#0f1419",
-  surface: "#1a2332",
-  surfaceAlt: "#141d29",
+  bg: "#101510",
+  surface: "#182019",
+  surfaceAlt: "#202a21",
+  elevated: "#1b241c",
 
-  textPrimary: "#e8eaed",
-  textSecondary: "#9aa0a6",
-  textTertiary: "#6b7280",
-  textOnPrimary: "#ffffff",
-  textOnSurface: "#d1d5db",
+  textPrimary: "#eef3ec",
+  textSecondary: "#bac5b9",
+  textTertiary: "#7f8c80",
+  textOnPrimary: "#081108",
+  textOnSurface: "#e6ece4",
 
-  border: "#2d3748",
-  divider: "#1e2d3d",
+  border: "#2d392e",
+  divider: "#263126",
 
-  error: "#f87171",
-  warning: "#fbbf24",
-  info: "#60a5fa",
+  error: "#f08a80",
+  warning: "#e3b35e",
+  info: "#86b9e6",
 
-  bubbleUser: "#2d6a4f",
-  bubbleUserGradient: ["#1b4332", "#2d6a4f"] as [string, string],
-  bubbleAssistant: "#1e2d3d",
-  bubbleAssistantBorder: "#2d4a3e",
-  toolCallBg: "#1a3a2a",
-  toolCallBorder: "#2d5a3e",
+  bubbleUser: "#4d8b64",
+  bubbleUserGradient: ["#3b7451", "#57936a"] as [string, string],
+  bubbleAssistant: "#1b241c",
+  bubbleAssistantBorder: "#314033",
+  toolCallBg: "#223222",
+  toolCallBorder: "#3c563d",
 
-  mapExpandBg: "#1a2d22",
+  mapExpandBg: "#213020",
+  inputBg: "#202a21",
 };
 
-// Re-export Colors for backward compat (light mode default)
 export const Colors = LightColors;
-
-// ── Theme Hook ────────────────────────────────────────────────
 
 export type ThemeColors = typeof LightColors;
 
@@ -96,8 +85,6 @@ export function useTheme(): { colors: ThemeColors; isDark: boolean } {
   };
 }
 
-// ── Spacing ──────────────────────────────────────────────────
-
 export const Spacing = {
   xs: 4,
   sm: 8,
@@ -107,8 +94,6 @@ export const Spacing = {
   xxl: 24,
   xxxl: 32,
 } as const;
-
-// ── Typography ───────────────────────────────────────────────
 
 export const FontSize = {
   xs: 11,
@@ -120,8 +105,6 @@ export const FontSize = {
   title: 26,
 } as const;
 
-// ── Border Radius ────────────────────────────────────────────
-
 export const Radius = {
   sm: 8,
   md: 12,
@@ -131,45 +114,41 @@ export const Radius = {
   full: 999,
 } as const;
 
-// ── Shadows ──────────────────────────────────────────────────
-
 export const Shadows = {
   sm: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 2,
     elevation: 1,
   },
   md: {
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.09,
+    shadowRadius: 8,
     elevation: 3,
   },
   lg: {
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
     elevation: 5,
   },
 } as const;
 
-// ── Helpers ──────────────────────────────────────────────────
-
 export const TOOL_CALL_LABELS: Record<string, string> = {
-  get_location: "📍 获取位置中",
-  search_nearby: "🔍 搜索附近",
-  get_weather: "🌤️ 查询天气",
-  get_trail_info: "🥾 查询步道",
-  plan_route: "🗺️ 规划路线",
-  plan_travel: "📋 规划行程",
+  get_location: "获取位置中",
+  search_nearby: "搜索附近",
+  get_weather: "查询天气",
+  get_trail_info: "查询路线",
+  plan_route: "规划路线",
+  plan_travel: "规划行程",
 };
 
 export function getToolCallLabel(name: string): string {
-  return TOOL_CALL_LABELS[name] ?? `⚡ ${name}`;
+  return TOOL_CALL_LABELS[name] ?? name;
 }
 
 export function formatTime(timestamp: number): string {
