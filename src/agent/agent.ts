@@ -5,6 +5,7 @@
  * Uses OpenAI-compatible chat completions API via fetch.
  */
 
+import { fetch } from "expo/fetch";
 import type {
   AGenUIContent,
   AgentConfig,
@@ -278,6 +279,7 @@ export class Agent {
         } else {
           this.parseNonStreamingResponse(text, message);
         }
+        await this.emit({ type: "message_update", message });
         return message;
       }
 

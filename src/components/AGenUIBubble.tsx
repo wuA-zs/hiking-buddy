@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { AGenUIView, type AGenUIActionEvent, type AGenUIErrorEvent } from "expo-agenui";
+import { Alert, Platform, Pressable, Text, ToastAndroid, StyleSheet, View } from "react-native";
+import { AGenUIView, copyTextToClipboard, type AGenUIActionEvent, type AGenUIErrorEvent } from "expo-agenui";
 import type { AGenUIContent } from "../agent/types";
 import { useTheme, Spacing, FontSize, Radius } from "../lib/theme";
 
@@ -49,8 +49,32 @@ export function AGenUIBubble({ content, onAction }: Props) {
     setNativeError(event.nativeEvent.message);
   }
 
+  async function handleCopyPayload() {
+    const ok = await copyTextToClipboard(formatJsonForCopy(parsed, content.payload));
+    if (Platform.OS === "android") {
+      ToastAndroid.show(ok ? "已复制 AGenUI payload" : "复制失败", ToastAndroid.SHORT);
+    } else {
+      Alert.alert(ok ? "已复制" : "复制失败", ok ? "AGenUI payload 已复制" : "当前平台不支持复制");
+    }
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: Colors.surface }]}>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: Colors.textTertiary }]}>AGenUI</Text>
+        <Pressable
+          onPress={handleCopyPayload}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.copyButton,
+            { borderColor: Colors.border, backgroundColor: pressed ? Colors.surfaceAlt : Colors.elevated },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="复制 AGenUI payload"
+        >
+          <Text style={[styles.copyText, { color: Colors.textSecondary }]}>复制</Text>
+        </Pressable>
+      </View>
       <AGenUIView
         payload={JSON.stringify(parsed)}
         colorScheme={Colors.bg === "#0F172A" ? "dark" : "light"}
@@ -65,6 +89,14 @@ export function AGenUIBubble({ content, onAction }: Props) {
       ) : null}
     </View>
   );
+}
+
+function formatJsonForCopy(value: unknown, fallback: string): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return fallback;
+  }
 }
 
 function isNativeAGenUIPayload(value: unknown): boolean {
@@ -84,9 +116,24 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   title: {
-    fontSize: FontSize.sm,
+    fontSize: FontSize.xs,
     fontWeight: "700",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.xs,
+  },
+  copyButton: {
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+  },
+  copyText: {
+    fontSize: FontSize.xs,
+    fontWeight: "600",
   },
   error: {
     fontSize: FontSize.xs,

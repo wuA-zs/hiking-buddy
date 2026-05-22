@@ -1,15 +1,22 @@
 import React from "react";
 import { Platform, Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { requireNativeViewManager } from "expo-modules-core";
+import { requireNativeModule, requireNativeViewManager } from "expo-modules-core";
 import type { AGenUIViewProps } from "./AGenUIView.types";
 
 let NativeAGenUIView: React.ComponentType<AGenUIViewProps> | null = null;
+let NativeAGenUIModule: { copyToClipboard?: (text: string) => boolean } | null = null;
 
 if (Platform.OS === "android") {
   try {
     NativeAGenUIView = requireNativeViewManager<AGenUIViewProps>("ExpoAGenUI");
   } catch {
     NativeAGenUIView = null;
+  }
+
+  try {
+    NativeAGenUIModule = requireNativeModule("ExpoAGenUI");
+  } catch {
+    NativeAGenUIModule = null;
   }
 }
 
@@ -41,6 +48,20 @@ const fallbackStyles = {
     lineHeight: 18,
   },
 };
+
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (NativeAGenUIModule?.copyToClipboard) {
+    return NativeAGenUIModule.copyToClipboard(text);
+  }
+
+  const clipboard = globalThis.navigator?.clipboard;
+  if (clipboard?.writeText) {
+    await clipboard.writeText(text);
+    return true;
+  }
+
+  return false;
+}
 
 export type {
   AGenUIAction,

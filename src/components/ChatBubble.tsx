@@ -1,7 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, Image } from "react-native";
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, ToastAndroid, View } from "react-native";
 import type { AgentMessage } from "../agent/types";
-import type { AGenUIActionEvent } from "expo-agenui";
+import { copyTextToClipboard, type AGenUIActionEvent } from "expo-agenui";
 import { useTheme, Spacing, FontSize, Radius, formatTime } from "../lib/theme";
 import { AssistantBubble } from "./AssistantBubble";
 import { AGenUIBubble } from "./AGenUIBubble";
@@ -13,6 +13,16 @@ interface Props {
 
 export function ChatBubble({ message, onAGenUIAction }: Props) {
   const { colors: Colors } = useTheme();
+  const copyText = getCopyText(message);
+
+  async function handleCopy() {
+    const ok = await copyTextToClipboard(copyText);
+    if (Platform.OS === "android") {
+      ToastAndroid.show(ok ? "已复制气泡内容" : "复制失败", ToastAndroid.SHORT);
+    } else {
+      Alert.alert(ok ? "已复制" : "复制失败", ok ? "气泡内容已复制" : "当前平台不支持复制");
+    }
+  }
 
   if (message.role === "user") {
     const text = message.content
@@ -35,7 +45,12 @@ export function ChatBubble({ message, onAGenUIAction }: Props) {
           ))}
           {text ? <Text style={[styles.userText, { color: Colors.textOnPrimary }]}>{text}</Text> : null}
         </View>
-        <Text style={[styles.timeUser, { color: Colors.textTertiary }]}>{formatTime(message.timestamp)}</Text>
+        <View style={styles.userMetaRow}>
+          <Pressable onPress={handleCopy} hitSlop={8} accessibilityRole="button" accessibilityLabel="复制气泡内容">
+            <Text style={[styles.copyMeta, { color: Colors.textTertiary }]}>复制</Text>
+          </Pressable>
+          <Text style={[styles.timeUser, { color: Colors.textTertiary }]}>{formatTime(message.timestamp)}</Text>
+        </View>
       </View>
     );
   }
@@ -64,12 +79,43 @@ export function ChatBubble({ message, onAGenUIAction }: Props) {
             return null;
           })}
         </AssistantBubble>
-        <Text style={[styles.timeAssistant, { color: Colors.textTertiary }]}>{formatTime(message.timestamp)}</Text>
+        <View style={styles.assistantMetaRow}>
+          <Text style={[styles.timeAssistant, { color: Colors.textTertiary }]}>{formatTime(message.timestamp)}</Text>
+          <Pressable onPress={handleCopy} hitSlop={8} accessibilityRole="button" accessibilityLabel="复制气泡内容">
+            <Text style={[styles.copyMeta, { color: Colors.textTertiary }]}>复制</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
 
   return null;
+}
+
+function getCopyText(message: AgentMessage): string {
+  if (message.role === "user") {
+    return message.content
+      .map((content) => {
+        if (content.type === "text") return content.text;
+        return `[image:${content.mimeType}]`;
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (message.role === "assistant") {
+    return message.content
+      .map((content) => {
+        if (content.type === "text") return content.text;
+        if (content.type === "agenui") return `AGenUI payload:\n${content.payload}`;
+        if (content.type === "toolCall") return `[tool:${content.name}] ${JSON.stringify(content.arguments)}`;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  return message.content.map((content) => content.text).join("\n");
 }
 
 const styles = StyleSheet.create({
@@ -105,12 +151,26 @@ const styles = StyleSheet.create({
   },
   timeUser: {
     fontSize: FontSize.xs,
-    marginTop: 2,
-    marginRight: Spacing.sm,
   },
   timeAssistant: {
     fontSize: FontSize.xs,
+  },
+  userMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginTop: 2,
+    marginRight: Spacing.sm,
+  },
+  assistantMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
     marginTop: 2,
     marginLeft: 50,
+  },
+  copyMeta: {
+    fontSize: FontSize.xs,
+    fontWeight: "600",
   },
 });
