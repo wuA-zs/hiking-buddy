@@ -3,6 +3,7 @@
 `reference.md` serves as navigation only; it no longer contains the full mixed handbook.
 
 Usage principles:
+
 - Do not load all sub-documents at once by default
 - Load only the `1–2` documents the current task truly needs
 - For machine-verifiable rules, the [`scripts/validate_a2ui.py`](scripts/validate_a2ui.py) script is the authoritative source
@@ -29,17 +30,15 @@ Usage principles:
 
 - DTO component:
   Start with [`docs/dto-component-mode.md`](docs/dto-component-mode.md) and [`docs/component-design.md`](docs/component-design.md)
-
 - Non-DTO component:
   Start with [`docs/component-catalog.md`](docs/component-catalog.md) and [`docs/component-design.md`](docs/component-design.md)
-
 - Non-DTO page:
   Start with [`docs/component-catalog.md`](docs/component-catalog.md), [`docs/page-design.md`](docs/page-design.md), and [`docs/visual-interaction.md`](docs/visual-interaction.md)
-
 - Bug fix / review / iterating on existing files:
   Start with [`docs/review-validation.md`](docs/review-validation.md)
 
 ## Validation Source
 
 Script location:
+
 - [`scripts/validate_a2ui.py`](scripts/validate_a2ui.py)

@@ -3,7 +3,7 @@
 export const bundledSkills: Record<string, string> = {
   "a2ui-generation": `---
 name: a2ui-generation
-description: Design and generate official A2UI v0.9 \`updateComponents\` and \`updateDataModel\` payloads for three modes: DTO component, non-DTO component, and non-DTO page. Use when asked to create or refine A2UI cards, components, or pages from DTO/JSON/business data, generate Python transformer code for DTO-driven components, iterate on existing A2UI output files by diff, improve mobile UI quality, or validate A2UI rules such as \`surfaceId\`, component id \`root\`, path binding, and component-vs-page boundaries.
+description: Design and generate A2UI \`updateComponents\` and \`updateDataModel\` payloads for three modes: DTO component, non-DTO component, and non-DTO page. Use when asked to create or refine A2UI cards, components, or pages from DTO/JSON/business data, generate Python transformer code for DTO-driven components, iterate on existing A2UI output files by diff, improve mobile UI quality, or validate A2UI rules such as \`surfaceId\`, \`root\`, path binding, and component-vs-page boundaries.
 ---
 
 # A2UI Generation
@@ -42,7 +42,7 @@ Before entering mode selection, determine whether the user input is an **informa
 - Main sections ≤ 3
 - Body text ≤ 2 paragraphs; each paragraph ≤ 3 lines
 - **FORBIDDEN**: Dynamic \`List\` child templates (i.e., \`children.componentId\`-driven template rows such as \`tips_item_template\`) — this is a detail-page structure, not a summary card
-- **FORBIDDEN**: Full-width hero image (\`aspect-ratio: 16/9 + width: 100%\`) — this is a page header, not a card element
+- **FORBIDDEN**: Full-width hero image (\`aspect-ratio: 16/9\` + \`width: 100%\`) — this is a page header, not a card element
 - **FORBIDDEN**: Expanding the card into an article or content detail page (multiple long body paragraphs + full lists)
 - Total card height must not exceed 2/3 of screen height
 
@@ -58,35 +58,10 @@ Before entering mode selection, determine whether the user input is an **informa
 - [ ] Total height within 2/3 screen?
 If any item fails → converge first or escalate to page explicitly. Never bypass.
 
-## Output Format for Chat Agent
-
-Only emit official A2UI v0.9 protocol messages in the payload. The payload must be \`createSurface\`, \`updateComponents\`, \`updateDataModel\`, \`deleteSurface\`, or a list of those messages.
-
-在聊天中输出一个完整的 \`agenui\` 围栏代码块：
-
-\`\`\`agenui
-{
-  "type": "agenui",
-  "payload": {
-    "version": "v0.9",
-    "updateComponents": {
-      "surfaceId": "card",
-      "components": [...]
-    },
-    "updateDataModel": {
-      "surfaceId": "card",
-      "path": "/data",
-      "value": {...}
-    }
-  }
-}
-\`\`\`
-
-App 会剥离 \`{ type: "agenui", payload: ... }\` 包装，将 \`payload\` 渲染为 A2UI 卡片气泡。普通对话用文字回复，仅在需要结构化 UI 时使用 \`agenui\`。
-
 ## Mode Selection
 
 Before starting, determine:
+
 1. Does the user want a \`component/card\` or a \`full page\`?
 2. Has the user provided a DTO?
 
@@ -97,15 +72,18 @@ Then enter exactly one of the following three modes:
 ### Mode 1: DTO Component
 
 Applicable when:
+
 - The user has provided a DTO
 - The user wants a component / card
 
 Deliverables:
+
 1. Python transformer code
 2. \`updateComponents\` JSON
 3. \`updateDataModel\` JSON
 
 Unified entry function:
+
 \`\`\`python
 def build_component_payload_from_dto(dto: dict) -> tuple[dict, dict]:
     ...
@@ -114,32 +92,39 @@ def build_component_payload_from_dto(dto: dict) -> tuple[dict, dict]:
 ### Mode 2: Non-DTO Component
 
 Applicable when:
+
 - The user has not provided a DTO
 - The user wants a component / card
 
 Deliverables:
+
 1. \`updateComponents\` JSON
 2. \`updateDataModel\` JSON
 
 Mandatory order (must not be reversed):
+
 1. Output UI layout (\`updateComponents\`) first
 2. Output data (\`updateDataModel\`) second
 
 ### Mode 3: Non-DTO Page
 
 Applicable when:
+
 - The user has not provided a DTO
 - The user wants a full page
 
 Deliverables:
+
 1. \`updateComponents\` JSON
 2. \`updateDataModel\` JSON
 
 Mandatory order (must not be reversed):
+
 1. Output UI layout (\`updateComponents\`) first
 2. Output data (\`updateDataModel\`) second
 
 Supplementary rules:
+
 - Only the three modes above are defined by default
 - If the user provides a DTO but explicitly wants a full page, do not silently apply one of these modes; ask first whether to design the page as DTO-driven
 
@@ -155,10 +140,38 @@ Do not read all sub-documents by default. Load only what the current task requir
 | Bug fix / review / iterating on existing artifacts | [\`docs/review-validation.md\`](docs/review-validation.md) | Whichever doc is directly related to the issue |
 
 Additional notes:
+
 - Load [\`docs/component-catalog.md\`](docs/component-catalog.md) when you need to verify atomic components, charts, fields, allowed values, or style whitelists
 - Load [\`docs/data-binding.md\`](docs/data-binding.md) when you need to verify path binding, template binding, or relative path rules
 - Load [\`docs/component-design.md\`](docs/component-design.md) when you need to verify component height budgets, card content budgets, or multi-column text budgets
 - Load [\`docs/page-design.md\`](docs/page-design.md) when you need to verify full-page structure, layout composition, or page-level sectioning
+
+## Output Persistence
+
+Final artifacts should be written to files by default, and the user should be told the paths explicitly.
+
+Priority order:
+
+1. If the user specifies a directory or filename, save according to that
+2. If the user provides an existing artifact directory, prefer saving near that context
+3. Otherwise choose a clear, sensible, easy-to-find location
+
+Default file naming:
+
+- \`*_components.json\`
+- \`*_datamodel.json\`
+- \`*_transformer.py\` or \`*_vo.py\`
+
+Non-DTO mode write order (mandatory):
+
+1. Generate and save \`*_components.json\` first
+2. Generate and save \`*_datamodel.json\` second
+
+To save tokens:
+
+- Write the first draft to disk immediately after generation
+- If the user continues modifying, iterate on the existing file by default
+- Each round of changes should edit the file and work from a diff — do not repaste the entire JSON in the conversation
 
 ## Workflow
 
@@ -166,8 +179,17 @@ Additional notes:
 2. Load only the sub-documents the current task truly needs
 3. Before formal output, explicitly list the layout rationale: at minimum describe the main sections, visual focal point, information rhythm, key horizontal relationships, and the role of images
 4. Based on that layout rationale, draft an internal first version, then perform at least \`1\` explicit design improvement before proceeding to formal output
-5. Output the first draft formally in an \`agenui\` fenced code block
-6. At delivery, if placeholder links were used, explicitly remind the user to replace them
+5. Output the first draft formally and write it to disk immediately (non-DTO mode: components before datamodel, mandatory)
+6. Run [\`scripts/validate_a2ui.py\`](scripts/validate_a2ui.py) immediately; if it fails, fix the file directly and re-run until it passes
+7. Only after the script passes for the first time, perform \`1–2\` rounds of model-level design review and improvement on the on-disk files
+8. During model review rounds: address palette coherence, information hierarchy, horizontal relationships, and premium feel; also perform a dedicated "protected content abnormal wrapping" check on all horizontal layouts — prioritize checking whether short phrases, CTAs, ratings, times, and prices are being squeezed and broken by narrow fixed widths
+9. If the model review modifies files, re-run the validation script; deliver only after it passes again
+10. At delivery, clearly state the output file paths; if placeholder links were used, explicitly remind the user to replace them
+
+When a "user explicitly required item conflicts with a rule":
+
+- Use \`overrides.json\` to exempt only the conflicting checks at minimum scope
+- Exempt only the relevant check; do not disable other validations as collateral
 
 ## Non-Negotiables
 
@@ -180,7 +202,7 @@ Only truly irreplaceable business invariants that scripts cannot fully substitut
 - When semantic meaning depends on a combination of fields (e.g., status + time), perform the combination mapping first, then decide whether to display or omit
 - \`Component/card\` mode must not silently become page-like; do not deliver a near-full-screen large card
 - Component mode content should converge first; escalate to page only when convergence fails, and do so explicitly
-- **Card hard gate (self-check before generating any JSON)**: main sections ≤ 3; no dynamic \`List\` sub-templates (i.e., \`children.componentId\`-driven template rows); no full-width hero image (\`aspect-ratio: 16/9 + width: 100%\`); body paragraphs ≤ 2; if any item fails, converge first or escalate to page explicitly — bypassing is not allowed
+- **Card hard gate (self-check before generating any JSON)**: main sections ≤ 3; no dynamic \`List\` sub-templates (i.e., \`children.componentId\`-driven template rows); no full-width hero image (\`aspect-ratio: 16/9\` + \`width: 100%\`); body paragraphs ≤ 2; if any item fails, converge first or escalate to page explicitly — bypassing is not allowed
 - **Information summary card scenario (query/search-term driven)**: structure is locked to \`Title → Core attributes (1–3) → Brief summary (≤ 2 lines) → Tag group → CTA\`; expanding into article narrative structure is forbidden
 - **Tag group and CTA must be in separate rows**: when a card bottom has both a tag group (>= 2 tags) and a CTA button, they must be separated using Column (tag row first, CTA below); placing them in the same Row is forbidden — even flex-wrap and flex-shrink cannot prevent the CTA from overflowing and being clipped
 - **⚠️ English model content inflation guard**: When query input is in English, the model tends to generate long-form article content. For every card task, actively resist generating: multiple long body paragraphs, full visitor tip lists, narrative sections, or any structure that resembles a detail page. If you find yourself writing more than 2 paragraphs of body text, stop and converge immediately
@@ -189,6 +211,7 @@ Only truly irreplaceable business invariants that scripts cannot fully substitut
 - Protected content — short phrases, CTAs, rating values, prices, times — must not wrap or fragment due to a fixed narrow width
 - \`CTA\` buttons default to content-driven width via \`padding + border-radius\`; do not write a fixed narrow width unless explicit alignment requirements exist and readability has been verified
 - When design requires images, do not fabricate non-existent image URLs
+- After the first draft, always iterate on the on-disk file; do not regenerate the entire artifact each round
 - Before formal output, the layout rationale must be explicitly listed; skipping layout planning and jumping straight to JSON is not allowed
 - The layout rationale must cover at minimum: main sections, visual focal point, content rhythm, key component relationships, and the role of images/charts
 - Before formal output, at least \`1\` explicit improvement round is required; the first version in your head must not be delivered directly as the final first draft
@@ -470,6 +493,7 @@ export const bundledSkillDocs: Record<string, string> = {
 ## Protocol Shape
 
 A2UI separates structure from data:
+
 - \`updateComponents\`: component tree, layout, styles, binding paths
 - \`updateDataModel\`: data content corresponding to binding paths
 - Dynamic content is bound via \`{"path": "..."}\`
@@ -576,7 +600,7 @@ Dialog. \`trigger\` is the triggering component id; \`content\` is the dialog bo
 
 #### \`RichText\`
 
-Supported HTML tags: \`<b>\`, \`<i>\`, \`<u>\`, \`<br>\`, \`<blockquote>\`, \`<del>\`, \`<s>\`, \`<sub>\`, \`<sup>\`, \`<strong>\`, \`<em>\`, \`<code>\`, \`<a href="...">\`. \`linksEnable\` defaults to \`true\`.
+Supported HTML tags: \`<font>\`, \`<color>\`, \`<a>\`, \`<br>\`, \`<blockquote>\`, \`<i>\`, \`<u>\`, \`<strike>\`, \`<sub>\`, \`<sup>\`, \`<strong>\`, \`<b>\`, \`<small>\`, \`<img>\`. \`linksEnable\` defaults to \`true\`.
 
 \`\`\`json
 {"id": "rt1", "component": "RichText", "text": {"path": "/data/richContent"}, "variant": "h1|h2|h3|h4|h5|body|caption", "linksEnable": true}
@@ -846,22 +870,27 @@ Usage guidance:
   "a2ui-generation/docs/component-design.md": `# Component Design
 
 ## Scope
+
 This document covers \`component/card\` mode only, not full pages.
 
 ## Height Boundary
+
 - \`Component/card\`: defaults to no more than \`1/3\` of page height
 - A card is a summary-type container, not a miniaturized page
 
 Do not expand using a page-level structure and then try to compress the height afterward.
 
 ## Card Content Budget
+
 In card mode, defaults should be:
+
 - Only one core conclusion area or primary visual focal point
 - Only one group of the most critical supporting info
 - Only one primary CTA or main status action area
 - Typically no more than \`2–3\` main sections
 
 Content that should not be placed in a card by default:
+
 - Long lists
 - Long tables
 - Long timelines
@@ -870,14 +899,15 @@ Content that should not be placed in a card by default:
 - Full page-level narrative chains
 
 ### Information Summary Card — Dedicated Rules (Query / Search-Term Scenario)
+
 When the query is a search term, place name, person name, event name, or concept word, the card is an **information summary card**. The following additional rules are mandatory:
 
-**English model content inflation warning**: English language models tend to produce article-style, detail-page content for these queries. Every rule below is a hard constraint — not a default preference that can be overridden by "making it richer."
+**⚠️ English model content inflation warning**: English language models tend to produce article-style, detail-page content for these queries. Every rule below is a hard constraint — not a default preference that can be overridden by "making it richer."
 
 **Hard content budget (non-negotiable upper limits)**:
 - Body text ≤ 2 paragraphs; each paragraph ≤ 3 lines
 - Dynamic \`List\` sub-templates (\`children.componentId\`-driven rows such as \`tips_item_template\`): **FORBIDDEN** — this is a detail-page structure
-- Full-width hero image (\`aspect-ratio: 16/9 + width: 100%\`): **FORBIDDEN** — this is a page header element, not a card element
+- Full-width hero image (\`aspect-ratio: 16/9\` + \`width: 100%\`): **FORBIDDEN** — this is a page header element, not a card element
 - Main sections ≤ 3
 - Total card height must not exceed 2/3 of screen height
 
@@ -900,27 +930,33 @@ CTA button (optional)
 - Any structure where you could replace the card with a news article and it would still make sense = you have gone too far
 
 For DTO component mode, additional rules apply:
+
 - When a secondary field is missing, prefer omitting the corresponding component rather than leaving an empty placeholder
 - When a key field for an entire section is missing, prefer omitting the entire section
 - The final card should remain complete and compact — missing fields must not leave visible blank gaps
 - When text length is uncertain, the structure must leave room for wrapping, truncation, and fallback layouts
 
 ## Card Escalation Rule
+
 Treat any of the following as exceeding the card budget:
+
 - Even after compression, the card fills or nearly fills a full screen
 - More than \`3\` main sections are needed to convey the information
 - The primary information requires continuous vertical scrolling to be fully seen
 - After removing secondary content, the card is still too tall, too full, or too fragmented
 
 The correct response is:
+
 1. Converge to a summary-type card
 2. If convergence still does not hold, escalate to a page
 3. Do not silently deliver a page-sized large card and call it a "component"
 
 ## Mobile Width Safety
+
 A2UI targets mobile narrow screens by default. When generating cards, avoid horizontal overflow first.
 
 General principles:
+
 - Do not put long text, long institution names, navigation paths, or body summaries in side-by-side multi-column structures
 - Do not rely on "text being just short enough" to maintain layout
 - Horizontal layouts are better suited for short labels, short numbers, button groups, and icon combinations
@@ -928,14 +964,17 @@ General principles:
 - If a local area naturally suits horizontal browsing and cannot be fully contained on a narrow screen, allow that local area to scroll horizontally to reveal more
 
 Supplementary notes:
+
 - "Prefer \`Column\`" is the default conservative strategy — it does not mean abandoning design quality
 - If a local section clearly suits left-right opposition, dual-side tension, or information juxtaposition, do not downgrade it to plain vertical stacking just to be safe
 - The correct approach is to first judge whether the horizontal relationship holds, then decide whether wrapping or reflow is needed
 
 ## Competitive Layouts
+
 When a local section naturally suits layouts like "core metric left / supporting info right", "main visual left / description right", or "left-right aligned", design it as a competitive horizontal layout — not a plain left-to-right concatenation.
 
 Goal:
+
 - When space allows, left and right sides form tension and order
 - Only when genuine competition occurs should wrapping, truncation, or vertical reflow be introduced
 - Do not let a column break spontaneously due to container modeling errors when there is no actual competition
@@ -943,40 +982,48 @@ Goal:
 In A2UI's current capabilities, runtime breakpoints, \`min-width\`, \`flex-basis\`, or text measurement for precise decisions are not available, so heuristic decisions must be made at generation time.
 
 Recommended flow:
+
 1. First identify whether this section is "left-right opposition" rather than "plain horizontal concatenation"
 2. Define the role and minimum readable form for each column
 3. Try to preserve the left-right anchor relationship first, then let weak information absorb compression
 4. Only switch to wrapping or vertical structure when heuristic judgment clearly shows real competition
 
 ## Protected Column Readability
+
 A protected column must not just be "visible" — it must maintain minimum readable form.
 
 Rules:
+
 - Do not give a protected column an excessively narrow fixed width that causes its internal text to wrap into \`2–3\` lines even when there is no competition
 - If a caption / unit label / supporting phrase in this column should be fully readable but is forced to break by a fixed width that is too small, this is a layout error, not valid responsive behavior
 - First ensure core numbers, main status, and key phrases are displayed completely before compressing other columns
 
 For short phrases:
+
 - Short phrase captions should by default remain as complete word groups — do not split them into ugly broken lines
 - If this column cannot hold both the core number and the phrase, prioritize reallocating column widths, adjusting information hierarchy, or rewriting the local structure
 - Do not let the protected column collapse first, then misattribute the problem to "competition with the right side"
 
 ## Short CJK Phrase Integrity
+
 Short CJK phrases, short CTAs, and short numeric phrases are high-risk break candidates by default — "broken but still visible" is not an acceptable result.
 
 Content treated as protected by default:
+
 - \`2–8\` character short phrases, e.g. "Book Now", "Open", "Patio View"
 - Numeric phrases, e.g. \`4.9\`, \`¥268\`, \`22:30\`
 - Number-plus-phrase, e.g. "Reputation 986+", "Today 30% off", "Avg. ¥268"
 - Short status labels and rating summaries next to icons
 
 Mandatory requirements:
+
 - Do not let such content wrap character-by-character, hang a single character, or leave punctuation on its own line due to a fixed narrow width
 - Do not split "Book Now" into "Book / Now", or break \`4.9\`, \`22:30\`, \`¥268\` into fragments
 - If the phrase is in a button column, rating column, status column, price column, or right-side action column, default to protecting its integrity
 - If the phrase's integrity and the current layout cannot coexist, fix the layout first — do not accept fragmented typography
 
 Priority order:
+
 1. Widen the protected column
 2. Move, downgrade, or push weak information to the next line
 3. Adjust local structure hierarchy
@@ -985,32 +1032,39 @@ Priority order:
 Do not mistake "short CJK phrase breaking first" for normal responsive behavior — it typically signals incorrect column width allocation.
 
 ## CTA Width Policy
+
 A \`CTA\` button is a protected column — do not default to a narrow fixed width just for the sake of alignment.
 
 Default strategy:
+
 - Buttons prefer \`padding + border-radius\` for volume; do not write a fixed \`width\` first
 - Short CTA text should naturally stretch the button width via content
 - If a button sits alongside a long description, let the description absorb compression rather than letting the button text break first
 - If the button label is a short phrase, do not accept character-by-character wrapping or a \`2x2\` grid-style layout
 
 Only consider a fixed width when:
+
 - The visual system explicitly requires equal-width button groups
 - Alignment with other fixed-width sibling modules is required
 - The fixed width has been verified to keep button text fully readable
 
 If a fixed width is required:
+
 - Estimate based on "minimum readable form" first — do not start with a visually appealing number
 - Account for large font sizes, horizontal padding, and icon space when computing the width budget
 - If the fixed width causes the button text to wrap before the description column does, treat it as a layout error and revert
 
 ## Multi-Column Text Budget
+
 When adopting a multi-column layout for premium feel, do not let all columns compete for width without limits.
 
 Assign a role to each column first:
+
 - Protected column: core numbers, main status, primary button, key visuals, avatars/thumbnails, core badges
 - Compressible column: descriptive text, supporting descriptions, secondary labels, supplementary notes, source attribution
 
 Handling principles:
+
 - Protected columns take priority for complete visibility — do not let long text squeeze them out
 - Compressible columns absorb shrinkage first
 - Long text defaults to wrapping first
@@ -1021,6 +1075,7 @@ Handling principles:
 - If this is plain concatenation rather than true left-right opposition, do not assume you have completed a premium horizontal layout
 
 Implementation strategy:
+
 - Give visual columns, number columns, and button columns stable width or stronger layout priority
 - Give text columns higher compressibility, e.g. allow \`flex-shrink\`
 - Text columns prefer multiple lines rather than forcing everything on one line
@@ -1031,6 +1086,7 @@ Implementation strategy:
 - For button columns, rating columns, and status columns, default to avoiding narrow fixed widths; when content includes short phrases or numeric phrases, natural width or a larger budget is even more important
 
 Anti-patterns:
+
 - Right-side CTA with a fixed narrow width, causing "Book Now" to split into two lines or four squares
 - Rating column simultaneously carrying star icon, score, and summary, with a narrow fixed width causing \`4.9\` or "Reputation 986+" to fragment
 - Left-side long description still fully expanded while the right-side protected column — rating or button — breaks first
@@ -1045,36 +1101,42 @@ This is the most common root cause of button overflow and clipping. When there a
 Reason: **flex-wrap only controls wrapping among direct children inside that container — it has no effect on sibling nodes (like cta_button) in the outer Row.**
 
 Typical wrong structure (forbidden — no flex property can fix this):
+
 \`\`\`
 bottom_row (Row, justify: spaceBetween)
-├── tag_group (Row, flex-grow: 1, flex-wrap: wrap) ← expands to fill remaining space
-│   ├── tag_c9 / tag_stem / tag_public
-└── cta_button (flex-shrink: 0) ← pushed outside right boundary, clipped invisible
+  ├── tag_group (Row, flex-grow: 1, flex-wrap: wrap)  ← expands to fill remaining space
+  │     ├── tag_c9 / tag_stem / tag_public
+  └── cta_button (flex-shrink: 0)  ← pushed outside right boundary, clipped invisible
 \`\`\`
 
 **Correct structure (mandatory)**: Separate tag group and CTA into independent rows using Column:
+
 \`\`\`
 bottom_section (Column)
-├── tag_row (Row, justify: start, flex-wrap: wrap)
-│   ├── tag_1 / tag_2 / tag_3
-└── cta_button (margin-top: 12px, width: 100%)
+  ├── tag_row (Row, justify: start, flex-wrap: wrap)
+  │     ├── tag_1 / tag_2 / tag_3
+  └── cta_button (margin-top: 12px, width: 100%)
 \`\`\`
 
 **Only exception**: When there is exactly 1 tag with very short text (<= 4 chars) and overflow has been confirmed not to occur, same-row placement may be considered. Otherwise, always use separate rows.
 
 ## Evidence Vs Badge
+
 Do not turn semantically different information into the same type of small block.
 
 How to differentiate:
+
 - Badge / tag / pill: short words, short phrases, weak decorative info — suitable for capsule/pill style
 - Evidence / supporting sentence: sentence-level proof, credible corroboration, supplementary explanation — defaults to a supporting info column, not a badge wall
 
 Rules:
+
 - Sentence-level evidence should not default to heavy rounded-corner blocks — avoid making the supporting area a secondary visual center
 - If the right side carries supporting evidence, prefer presenting it as an ordered supporting info area, not a group of competing mini-cards
 - To strengthen hierarchy, prefer arrangement, whitespace, font size, and color layering — not a pile of independent colored blocks adding visual weight
 
 ## Card Shell Guidance
+
 - A single card defaults to one main card shell
 - Use lightweight sectioning inside the main card — no card-within-card
 - If \`Card\` is already used as the main shell, its immediate children must not add a full visual shell (\`background-color + border-radius + drop-shadow\`)
@@ -1084,7 +1146,9 @@ Rules:
 - Cards should be composable content blocks, not standalone panels with an outer background plate
 
 ## Missing Data Behavior
+
 For missing fields in DTO component mode, the default behavior should be "structural pruning", not "style hiding":
+
 - Missing text field: omit the corresponding text component
 - Missing image field: omit the corresponding image component and its wrapper
 - Missing badge / tag field: omit the corresponding badge area
@@ -1093,39 +1157,57 @@ For missing fields in DTO component mode, the default behavior should be "struct
 The goal is for the final structure to be naturally compact — not held together by empty values, empty containers, or hidden styles.
 
 ## Image Strip Fill Rule
+
 When a card needs "multiple images in a row" and the images are the primary visual, fill must be prioritized over mere visibility.
 
 Mandatory requirements:
+
 - In an image strip that needs to fill horizontally, prefer letting \`Row\` carry \`Image\` directly — do not wrap in an extra \`Card\` or container by default
 - \`Image\` defaults to \`fit: cover\` — avoid thumbnails floating in large empty slots
 - Do not use \`variant\` (e.g. \`smallFeature\`, \`mediumFeature\`) on \`Image\` in a fill strip, as the renderer may apply built-in sizes that prevent filling the parent layout
 - A2UI style sizes support \`px\` only — do not use \`%\`, \`vw\`, or similar units to express fill
 
 Recommended implementation:
+
 - Image strip container: default to \`Row\` (fill-style primary visual); switch to \`List(direction=horizontal)\` only when narrow-screen clipping risk is real
 - Image component: plain \`Image\`
 - Image style: at minimum include a uniform \`height\` (px) + \`flex-grow: 1\` + \`flex-shrink: 1\` + necessary border-radius/clipping styles
 - Spacing: use \`margin\` (four values) to control gaps between image items
 
 Standard non-scrolling image strip (preferred):
+
 \`\`\`json
 {"id": "image_strip", "component": "Row", "children": ["image_0", "image_1", "image_2"], "align": "stretch"}
 {"id": "image_0", "component": "Image", "url": {"path": "/card/images/0"}, "fit": "cover", "styles": {"height": "220px", "flex-grow": 1, "flex-shrink": 1, "margin": "0px 8px 0px 0px", "border-radius": "18px", "overflow": "hidden"}}
 \`\`\`
 
 Standard horizontal-scroll image strip (fallback):
+
 \`\`\`json
 {"id": "image_strip", "component": "List", "children": ["image_0", "image_1", "image_2"], "direction": "horizontal", "align": "start"}
 {"id": "image_0", "component": "Image", "url": {"path": "/card/images/0"}, "fit": "cover", "styles": {"width": "312px", "height": "252px", "margin": "0px 12px 0px 0px", "border-radius": "20px"}}
 \`\`\`
 
 Selection strategy (mandatory):
+
 1. Use \`Row + Image(fit: cover) + flex-grow/flex-shrink\` for a fill row first (default)
 2. If this causes static clipping on the target narrow screen, the last image gets swallowed, or the visible width is clearly insufficient, switch to \`List(horizontal)\` (fallback)
 3. Do not default to horizontal scrolling just because there are multiple images — scrolling is a risk mitigation, not a default style
 
+Validation and fallback strategy:
+
+1. Preferred approach: \`Row + Image(fit: cover) + flex\` — verify that it truly fills
+2. If images are clipped and cannot be fully shown, switch to \`List(horizontal)\` and assign a fixed \`px\` width based on image count (define explicit widths for 1/2/3/4 images)
+3. If the renderer has unstable \`flex\` behavior, do not keep relying on auto-stretch — use predictable fixed-width strategy directly
+4. Regardless of the approach, ensure:
+   - Images remain on one row
+   - Layout is predictable as image count changes
+   - No static clipping, large empty slots, or thumbnail feel
+
 ## Compatibility Driven Layout
+
 Because the DTO component Python will handle more DTOs of the same type, the component structure itself must also be compatible:
+
 - Do not build layout on the assumption that "every field happens to exist and every text happens to be short"
 - Explicitly layer fields into required / optional
 - Design the layout-collapse path for when optional fields are missing
@@ -1134,12 +1216,15 @@ Because the DTO component Python will handle more DTOs of the same type, the com
   "a2ui-generation/docs/data-binding.md": `# Data Binding
 
 ## Core Rules
+
 - \`updateComponents\` contains only structure, not concrete business values
 - Dynamic values always use binding paths
 - All binding paths use \`/\` as the separator, never dot notation
 
 ## Absolute Path Binding
+
 Example:
+
 \`\`\`json
 {"id": "t1", "component": "Text", "text": {"path": "/page/title"}}
 \`\`\`
@@ -1149,11 +1234,13 @@ Example:
 \`\`\`
 
 Rules:
+
 - Absolute paths must use \`/\` as the separator, e.g. \`/page/title\`
 - Do not write \`/page.title\`
 - Nested fields also use \`/\`, e.g. \`/fuelCard/labels/availableLiters\`
 
 ## Dynamic Template Binding
+
 Both \`List\` and \`Column\` can drive child components from data. Template components use relative paths internally.
 
 \`\`\`json
@@ -1166,18 +1253,21 @@ Both \`List\` and \`Column\` can drive child components from data. Template comp
 \`\`\`
 
 Relative path rules:
+
 - Simple field: \`name\`
 - Nested field: \`labels/availableLiters\`
 - Do not write \`labels.availableLiters\`
 
 ## Advanced Component List Binding
+
 For protocol-level compatibility understanding: list-type attributes in advanced components typically use a string path directly, and element field mapping uses relative paths:
 
 \`\`\`json
-{"component": "", "items": "/cg/items", "itemTitle": {"path": "title"}}
+{"component": "<advanced_component>", "items": "/cg/items", "itemTitle": {"path": "title"}}
 \`\`\`
 
 Common list-type attribute names:
+
 - \`items\`
 - \`cards\`
 - \`contents\`
@@ -1186,7 +1276,9 @@ Common list-type attribute names:
 - \`tags\`
 
 ## updateDataModel Shape
+
 Standard structure:
+
 \`\`\`json
 {
   "version": "v0.9",
@@ -1199,76 +1291,249 @@ Standard structure:
 \`\`\`
 
 Rules:
+
 - \`path\` must start with \`/\`
 - \`path\` must not use dot notation
 - \`value\` must be semantically consistent with \`path\`
 
 ## Binding Reminders
+
 - Design the component tree first, then map data — do not hard-code values into components
 - List templates prefer relative paths — do not write array element fields as absolute paths
 - Any occurrence of \`/foo.bar\` or \`labels.availableLiters\`-style paths is an error
 `,
   "a2ui-generation/docs/dto-component-mode.md": `# DTO Component Mode
 
-## Scope
-This document covers \`DTO Component\` mode only.
+## When To Use
 
-## When to Use
-- The user has provided a DTO (data transfer object)
-- The user wants a component / card (not a full page)
+Enter this mode only when both of the following conditions are met:
+
+- The user has provided a DTO
+- The user wants a \`component/card\`
+
+If the user provides a DTO but wants a full page, do not default into this mode — ask first.
 
 ## Deliverables
-1. Python transformer code (\`*_transformer.py\`)
+
+Default deliverables are three items:
+
+1. Python transformer code
 2. \`updateComponents\` JSON
 3. \`updateDataModel\` JSON
 
-## Unified Entry Function
-All Python transformers must use this entry point:
+Important notes:
+
+- In this mode, Python is the single source of truth
+- Both JSON files must be produced by running the Python code
+- Do not deliver Python on one side and hand-write a separate independent JSON on the other
+
+## Unified Python Entry
+
+The unified entry function name for external delivery must be:
 
 \`\`\`python
 def build_component_payload_from_dto(dto: dict) -> tuple[dict, dict]:
-    """
-    Args:
-        dto: raw data transfer object (dict)
-
-    Returns:
-        tuple of (updateComponents_dict, updateDataModel_dict)
-    """
     ...
 \`\`\`
 
-## DTO Discipline
+Rules:
 
-### Required vs Optional Fields
-- Explicitly layer fields into required / optional
-- Design the layout-collapse path for when optional fields are missing
-- When a secondary field is missing, prefer omitting the corresponding component rather than leaving an empty placeholder
-- When a key field for an entire section is missing, prefer omitting the entire section
-- The final card should remain complete and compact — missing fields must not leave visible blank gaps
+- The function name is fixed: \`build_component_payload_from_dto\`
+- The return value is fixed: \`(update_components, update_datamodel)\`
+- Additional private helper functions for VO, intermediate mapping, or utility logic are allowed
+- Do not change the external delivery entry function name
 
-### Semantic Validity Check
-- DTO fields must pass a semantic validity check before display; non-empty does not equal informative
-- When semantic meaning depends on a combination of fields (e.g., status + time), perform the combination mapping first, then decide whether to display or omit
-- Low-information-value fields (generic / section words) should be filtered or downgraded
+## Python As Single Source Of Truth
 
-### Compatibility
-- The Python must be compatible with more DTOs of the same type, not just tailored to one sample
-- Do not build layout on the assumption that "every field happens to exist and every text happens to be short"
-- When text length is uncertain, the structure must leave room for wrapping, truncation, and fallback layouts
+In DTO component mode, the final delivery chain must be:
 
-## Common Combined Fields
-- \`openStatus/openStatusCode/status/openTime/*\` should be combined into readable status copy, not single-field output
+\`DTO -> Python -> updateComponents/updateDataModel\`
+
+Not:
+
+\`DTO -> Python\`
+
+plus a separate fork:
+
+\`DTO -> Manually hand-written JSON pair\`
+
+Mandatory requirements:
+
+- Write the Python transformation logic first
+- Run Python to produce the two JSONs
+- The final on-disk \`*_components.json\` and \`*_datamodel.json\` must come from Python's output
+- If Python is modified, re-run it to refresh both JSONs
+- Do not manually maintain a final JSON that drifts from Python
+
+## Compatibility First
+
+In DTO component mode, the generated Python is not a one-off script — it will be used to process more DTOs of the same type.
+
+Design it as a reusable transformer, not something that barely works for the current single DTO.
+
+Mandatory requirements:
+
+- For every field, consider compatibility strategies for missing values, empty values, unstable types, and minor naming variations
+- For optional fields, default to graceful degradation — do not let the entire transformer fail lightly
+- For required fields, explicit errors are allowed, but the error must identify which key field is missing
+- Do not treat the current sample DTO as the only fixed structure
+
+## DTO Data Discipline
+
+When the user provides a DTO:
+
+- All display values must come directly from the DTO, or from deterministic transformations of DTO fields
+- Hard-coding business copy, summaries, marketing language, or supplementary facts is forbidden
+- Allowed processing: concatenation, enum mapping, formatting, list reorganization
+- Every dataModel display field should be traceable to its DTO source
+- A field being non-empty does not equal it being informative; apply semantic validity filtering
+
+Semantic validity filtering (mandatory):
+
+- For status/label short text, if it is a generic word, placeholder word, group name, or section name, treat it as "low information value" and omit it
+- Only display values that provide clear business meaning (can help in judging, deciding, or understanding the current object's state)
+
+Field combination semantics (mandatory):
+
+- Do not treat every field as an independently displayable unit; first determine whether it is a "label field", "status field", or "detail field"
+- If a field is just a label (e.g. \`openStatus = "Business Hours"\`), combine it with the corresponding status/detail fields before displaying
+- For business hours information, prefer combining the following fields to generate the final copy rather than displaying any single field alone:
+  - Status signal: \`status/opentimeStatus\`, \`openStatusCode\`
+  - Time detail: \`status/openTime/shortOpenTime\`, \`status/openTime/normalTimeText\`, \`openTime\`
+  - Label field: \`openStatus\` (used only as semantic label or can be omitted)
+- Recommended output: combined semantic copy like \`"Open · 10:00–23:30"\`, \`"Closed · Opens tomorrow at 10:00"\` — avoid displaying just "Business Hours"
+
+## Auto Hide By Omission
+
+In DTO component mode, "auto-hide" capability is supported, but the implementation is not runtime conditional rendering — it is conditional generation at the Python transformation phase.
+
+Correct approach:
+
+- If a DTO field is missing, empty, or does not constitute a valid display value, do not write the corresponding component
+- Also do not write the corresponding dataModel field
+- If the key fields for an entire section are all missing, do not output the entire section at all
+
+This means "auto-hide" translates to:
+
+- Not adding that component id to the parent component's \`children\`
+- Not generating that component definition
+- Not generating that component's corresponding data
+
+Do not use the following pseudo-solutions:
+
+- Generating the component but with an empty string
+- Using \`display: none\` or \`visibility: hidden\` for data-driven hiding
+- Keeping empty containers, empty sections, or empty titles and expecting the layout to collapse on its own
+
+Recommended pattern:
+
+\`\`\`python
+def build_component_payload_from_dto(dto: dict) -> tuple[dict, dict]:
+    components = []
+    root_children = []
+    data_value = {}
+
+    subtitle = dto.get("subtitle")
+    if subtitle:
+        components.append(
+            {"id": "subtitle", "component": "Text", "text": {"path": "/card/subtitle"}}
+        )
+        root_children.append("subtitle")
+        data_value["subtitle"] = subtitle
+
+    # Same pattern for other fields — omit if missing
+    ...
+\`\`\`
+
+## Required Vs Optional Fields
+
+When writing a transformer, first divide fields into two categories:
+
+### Required Fields
+
+These fields may raise an error when missing:
+
+- Fields without which the card's primary semantics cannot be identified
+- Fields without which the main title / main status / primary visual / primary CTA cannot be formed
+- Fields whose absence leaves the card with no clear meaning
+
+Requirements:
+
+- Error messages must explicitly identify the missing field or missing field group
+- Do not use vague errors like "invalid data"
+- Do not continue assembling a semantically broken card when a key field is missing
+
+### Optional Fields
+
+These fields default to graceful handling when missing:
+
+- Do not generate the corresponding component
+- Do not generate the corresponding data
+- Downgrade to a more compact layout when necessary
+
+Do not escalate optional field absence into an error.
+
+## Overlong Text Handling
+
+Because this Python will process more DTOs of the same type, overlong text must be considered by default.
+
+Requirements:
+
+- Do not assume titles, subtitles, labels, descriptions, sources, or institution names will always be short
+- Design convergence strategies for long text at the structural design stage
+- Treat "text overlong" as normal input, not exceptional input
+
+Default handling direction:
+
+- Main title: prefer preserving, allow wrapping; if it still affects structure, apply controlled truncation
+- Subtitle, description, source, supplementary copy: prefer wrapping or \`line-clamp\`
+- Badge/tag: reduce the number on one row when necessary, or omit weak labels entirely
+- Multi-column layout: the column containing long text is the compressible column — do not push other columns off screen
+
+Key point:
+
+- When text is overlong, prioritize adjusting component structure and text styles
+- Do not fail the entire DTO transformation just because some text is too long
+
+## DTO Component Workflow
+
+1. Map out the DTO's field structure, hierarchy, and reusable fields
+2. Mark which fields are required and which are optional
+3. Mark which non-empty fields have low information value (generic / placeholder / section words), and which fields need to be combined before they carry semantic meaning
+4. Design the component structure, reserving fallback space for missing fields, low-info fields, combined fields, and long text
+5. Write the Python mapping to convert the DTO to final payload; omit at component level or section level when fields are missing, have low info value, or combination fails
+6. Run Python to directly produce \`updateComponents\` and \`updateDataModel\`
+7. Write the Python output to two JSON files on disk
+8. Run the validation script immediately; if it fails, fix the Python or artifacts directly and re-run until passing
+9. Only after the script passes, perform model-level design review and optimization
+10. If the model review produces changes, re-run the validation script until it passes again
+
+Do not skip steps \`5–6\` and hand-write the final JSON from imagination.
+
+## DTO Reminders
+
+- Do not write business values into components
+- If the DTO is missing something, treat it as missing — do not invent business facts
+- When a DTO field is missing, prefer omitting the component and data rather than leaving an empty shell component
+- Both JSONs are the output of running Python, not a second source of truth maintained in parallel with Python
+- This Python must be compatible with more DTOs of the same type — do not hard-code the current input as the only structure
+- When optional fields are missing, default to degradation; when key fields are missing, explicit errors are allowed
+- When text is overlong, prioritize layout/style convergence — do not casually fail on overlong text as an exception
+- If the design requires a button but the DTO provides no real link, do not degrade to a fake button
 `,
   "a2ui-generation/docs/page-design.md": `# Page Design
 
 ## Scope
+
 This document covers \`full page\` mode only, not components/cards.
 
 ## Page Boundary
+
 - \`Full page\`: defaults to at least \`2–3\` screens
 - A page should contain multiple content sections, not just a stretched card
 
 ## Page Structure
+
 A full page typically combines multiple sections using \`Column\`, with \`Divider\` in between:
 
 \`\`\`json
@@ -1280,13 +1545,16 @@ A full page typically combines multiple sections using \`Column\`, with \`Divide
 \`\`\`
 
 A page should typically have:
+
 - A clear main heading area
 - At least \`2–3\` content sections
 - Clear information hierarchy
 - A rhythm that allows continuous downward scrolling, not one huge content block
 
 ## Page-Only Content
+
 The following content is better suited for pages than cards:
+
 - Long lists
 - Long tables
 - Long timelines
@@ -1295,6 +1563,7 @@ The following content is better suited for pages than cards:
 - Multi-paragraph explanatory text
 
 ## Page Layout Guidance
+
 - Pages can have richer sectioning, rhythm, and visual transitions
 - Do not mechanically apply a three-column statistics card template to the page summary area
 - Multiple sections are allowed inside a page, but each section should still have clear hierarchy
@@ -1302,9 +1571,11 @@ The following content is better suited for pages than cards:
 - Do not make the entire page's main content area require horizontal scrolling to be fully seen
 
 ## Pre-Output Layout Planning
+
 Before formally outputting \`updateComponents\`, explicitly write out a layout rationale. Do not jump directly to generating JSON.
 
 This pre-output layout rationale must answer at minimum:
+
 - What main sections will the page have
 - What is the visual focal point of the first screen / hero
 - How the information rhythm unfolds: hook first, then explain, then expand, then close
@@ -1312,6 +1583,7 @@ This pre-output layout rationale must answer at minimum:
 - What roles images, charts, route ribbons, and timelines each play
 
 Recommended minimal template:
+
 1. \`Page skeleton\`
    - Example: \`hero -> atmosphere guide -> main schedule -> evening closing -> practical info -> CTA\`
 2. \`Visual focal point\`
@@ -1322,12 +1594,15 @@ Recommended minimal template:
    - Example: timeline with fixed info on the left and flexible copy on the right; route overview as a full ribbon, not easily-squeezed chip strings
 
 ## Explicit Improvement Before Formal Output
+
 After completing the layout rationale above, do not directly deliver the first version as formal output. At least one explicit improvement round is required, and it must explain:
+
 - What is not premium enough / not complete enough / not well-designed in the first version
 - What the second version intends to strengthen
 - Whether the improvement is reflected in layout, visual focal point, rhythm, palette, and information hierarchy — not just rewriting a few lines of copy
 
 Default priority for improvement:
+
 - Remove template feel; strengthen overall page coherence
 - Improve premium feel and refinement, not just stacking more components
 - Optimize the transition between the first screen and subsequent sections
@@ -1335,7 +1610,9 @@ Default priority for improvement:
 - Optimize the presentation of routes, times, CTAs, and other high-risk horizontal information
 
 ## Page Escalation Reminder
+
 If the user originally wanted only a component/card, but the content clearly requires:
+
 - Multiple main sections
 - Continuous vertical scrolling
 - Multi-paragraph narrative explanation
@@ -1346,13 +1623,17 @@ Then explicitly suggest: this is better suited for \`page\` mode.
   "a2ui-generation/docs/review-validation.md": `# Review Validation
 
 ## Purpose
+
 This document unifies the review and validation process after a first draft, with the goal of:
+
 1. Removing prose-like stacking; improving layout and visual quality
 2. Ensuring readability, tappability, and usability on small screens
 3. Passing both script and model validation without violating user requirements
 
 ## End-to-End Flow
+
 After the first draft is written to disk, execute the following flow by default:
+
 1. Read the on-disk file (review based on file, do not start a new draft)
 2. Run the script validation (\`scripts/validate_a2ui.py\`)
 3. If it fails, fix the original file directly and re-run until it passes
@@ -1362,7 +1643,9 @@ After the first draft is written to disk, execute the following flow by default:
 7. Only after the script passes and model review is complete can delivery happen
 
 ## Round Checklist (Every Round)
+
 Check the following universal items every round:
+
 - Has the mode been clearly identified: \`DTO Component\` / \`Non-DTO Component\` / \`Non-DTO Page\`
 - Can all data paths be found in the \`dataModel\`
 - Are any banned advanced components, unsupported style properties, or non-reproducible hard-coded values used
@@ -1379,7 +1662,9 @@ Check the following universal items every round:
 - For full pages: is there obvious "collage-style" color palette jumping? Do the hero, main body sections, and night/chart/CTA areas belong to the same color band system
 
 ## Page Palette Review
+
 When the task is \`Non-DTO Page\`, after the script first passes, perform an additional "page palette coherence focused review":
+
 1. Ignore images; look only at component background colors, text colors, button colors, and tag colors
 2. Judge whether the page looks like one cohesive work, not multiple templates stitched together
 3. Focus checks:
@@ -1394,6 +1679,7 @@ When the task is \`Non-DTO Page\`, after the script first passes, perform an add
    - Finally, preserve one necessary dark opening area if absolutely needed
 
 Experience thresholds:
+
 - The full page defaults to allowing at most \`1\` clear dark opening area
 - If the \`hero\` is already dark, avoid multiple independent dark large sections after it
 - If the user has not explicitly requested strong contrast, default to "unified" over "contrasting"
@@ -1401,6 +1687,7 @@ Experience thresholds:
 ## Mode-Specific Checks
 
 ### For \`Component/Card\` (DTO + Non-DTO)
+
 - Is height within the single-screen \`1/3\` budget, avoiding page-sized large cards
 - Are main sections converged to \`2–3\` or fewer; is primary info focused enough
 - Is there a double card shell: \`Card\` outer shell exists, and inner layer adds another full visual shell
@@ -1416,7 +1703,9 @@ Experience thresholds:
 - Is horizontal scrolling used only for local horizontal consumption areas, not for main content areas
 
 ## Protected Content Wrap Review
+
 For any horizontal layout, during the model review phase after the script first passes, perform an additional "protected content abnormal wrapping focused review":
+
 1. List the protected content in the current section:
    - CTA label text
    - Status words / short badges
@@ -1433,11 +1722,13 @@ For any horizontal layout, during the model review phase after the script first 
    - Only then truncate weak information
 
 Focused anti-patterns:
+
 - Short CTAs like "Book Now" being cut into two lines by a narrow button
 - Short values like \`4.9\`, \`22:30\`, \`¥268\` being compressed into fragments by fixed-width columns
 - Left-side long description still fully expanded while the right-side rating column or button column has already broken
 
 ### For \`DTO Component\` Only
+
 - Is the Python entry fixed as \`build_component_payload_from_dto\`
 - Do \`*_components.json\` and \`*_datamodel.json\` come directly from running Python
 - Are \`required\` and \`optional\` fields clearly distinguished
@@ -1449,22 +1740,28 @@ Focused anti-patterns:
 - Are \`openStatus/openStatusCode/status/openTime/*\` combined into readable status copy, not single-field output
 
 ## Validation Script
+
 Script location:
+
 - [\`scripts/validate_a2ui.py\`](scripts/validate_a2ui.py)
 
 Common invocations:
+
 - \`python scripts/validate_a2ui.py components.json datamodel.json\`
 - \`python scripts/validate_a2ui.py combined.md\`
 - \`python scripts/validate_a2ui.py components.json datamodel.json overrides.json\`
 - \`python scripts/validate_a2ui.py combined.md overrides.json\`
 
 ## User Requirement First (Targeted Override)
+
 When a user's explicit requirement conflicts with the default specification:
+
 1. Satisfy the user's explicit requirement first
 2. Exempt only the conflicting check items (minimum scope)
 3. Keep all other checks enabled
 
 Recommended \`overrides.json\`:
+
 \`\`\`json
 {
   "userRequirementFirst": true,
@@ -1476,7 +1773,9 @@ Recommended \`overrides.json\`:
   "a2ui-generation/docs/visual-interaction.md": `# Visual Interaction
 
 ## Default Visual Direction
+
 Unless the user explicitly requests minimal, simple, plain, or understated, the default visual direction should be:
+
 - Refined
 - Beautiful
 - Visually striking
@@ -1487,9 +1786,11 @@ Unless the user explicitly requests minimal, simple, plain, or understated, the 
 Do not default to "fewest components" or "lowest style cost" — actively create stronger design expression within what the protocol allows.
 
 ## Page Palette Coherence
+
 For \`full page\` tasks, the palette should first satisfy "the whole page is one visual language" before considering whether individual sections are eye-catching enough.
 
 Priority principles:
+
 - Start by establishing a full-page main color band, e.g. "warm off-white base + low-saturation blue-grey accent" or "light grey-white base + golden-brown accent"
 - If the \`hero\` / heading area uses dark color, it can only be used once as a clear, restrained opening — subsequent sections need a smooth return, not repeated dark-light jumps
 - If the main body of the page after the hero is light-background, prefer pulling the \`hero\` into the same light-background system too, letting the image itself deliver the visual impact rather than relying on an extra large dark block
@@ -1498,18 +1799,22 @@ Priority principles:
 - Tags, badges, route ribbons, buttons, and callouts should reuse the same accent color logic, not each go their own way
 
 Experience rules for page mode:
+
 - If you can immediately divide the page into "dark section", "light section", "another dark section", it is likely not cohesive
 - If you ignore all image areas and look only at background colors and text colors, the page should still look like one continuous work
 - \`chart\`, \`night\`, \`cta\`, and other sections that are easily made into full dark blocks: try light-background expression first; preserve a large dark block only when the user explicitly needs strong contrast or a night atmosphere requires it
 - A page needs rhythm, not stacked contrast; color rhythm should be continuous, gentle, and predictable
 
 ## Real Interaction
+
 Elements that are designed to be clickable must use real interaction by default:
+
 - Use \`Button + functionCall\` for navigation / opening links
 - Use \`Button + event\` for business actions / host integration / continued response
 - Do not output fake buttons; do not let \`Text\` or plain containers pretend to be clickable
 
 If the user has not provided a specific URL / schema / event but the design still requires a real button:
+
 - Still output a real \`Button\` first
 - A placeholder \`functionCall.openUrl\` may be used temporarily
 - The \`url\` can use an obvious placeholder link, e.g. \`https://example.com/todo\`
@@ -1517,20 +1822,25 @@ If the user has not provided a specific URL / schema / event but the design stil
 - The final reply must remind the user to replace with the real link, schema, or event
 
 Button visibility safety net:
+
 - Do not assume \`variant\` will always provide a readable background color on all renderers
 - If button label text uses a light color (e.g. white), explicitly provide a dark background (e.g. \`background-color\`) on the button container, or switch to dark label text
 - A button should at minimum have a clickable form: both \`padding\` and \`border-radius\` are recommended
 - Before delivery, manually check: CTA label text is clearly visible against the actual background, not blending into it
 
 ## Image Sourcing
+
 When the design requires image decoration:
+
 - If the user's provided materials already contain usable images, prioritize making full use of them
 - If the user has not provided images but the visual clearly needs them, search online for suitable real images before using them
 - Do not fabricate non-existent image URLs
 - If no reliable, suitable, accessible image can be found, switch to an image-free approach rather than filling in a random URL
 
 ## Anti-Patterns To Avoid
+
 Avoid the following structures by default:
+
 - Using a \`Text\` styled to look like a button as a CTA without a \`Button.action\`
 - Turning an entry that should be clickable into explanatory text with no real event response
 - Button text color relying on \`variant\` guesswork, making button labels invisible
@@ -1550,6 +1860,7 @@ Avoid the following structures by default:
 \`reference.md\` serves as navigation only; it no longer contains the full mixed handbook.
 
 Usage principles:
+
 - Do not load all sub-documents at once by default
 - Load only the \`1–2\` documents the current task truly needs
 - For machine-verifiable rules, the [\`scripts/validate_a2ui.py\`](scripts/validate_a2ui.py) script is the authoritative source
@@ -1576,19 +1887,17 @@ Usage principles:
 
 - DTO component:
   Start with [\`docs/dto-component-mode.md\`](docs/dto-component-mode.md) and [\`docs/component-design.md\`](docs/component-design.md)
-
 - Non-DTO component:
   Start with [\`docs/component-catalog.md\`](docs/component-catalog.md) and [\`docs/component-design.md\`](docs/component-design.md)
-
 - Non-DTO page:
   Start with [\`docs/component-catalog.md\`](docs/component-catalog.md), [\`docs/page-design.md\`](docs/page-design.md), and [\`docs/visual-interaction.md\`](docs/visual-interaction.md)
-
 - Bug fix / review / iterating on existing files:
   Start with [\`docs/review-validation.md\`](docs/review-validation.md)
 
 ## Validation Source
 
 Script location:
+
 - [\`scripts/validate_a2ui.py\`](scripts/validate_a2ui.py)
 `
 };

@@ -69,7 +69,7 @@ export function ChatBubble({ message, onAGenUIAction }: Props) {
             if (content.type === "text") {
               return content.text ? (
                 <Text key={`${message.id}-text-${index}`} style={[styles.assistantText, { color: Colors.textPrimary }]}>
-                  {content.text}
+                  {formatDisplayText(content.text)}
                 </Text>
               ) : null;
             }
@@ -116,6 +116,10 @@ function getCopyText(message: AgentMessage): string {
   }
 
   return message.content.map((content) => content.text).join("\n");
+}
+
+function formatDisplayText(text: string): string {
+  return text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1");
 }
 
 const styles = StyleSheet.create({

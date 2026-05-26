@@ -1,13 +1,17 @@
 # Review Validation
 
 ## Purpose
+
 This document unifies the review and validation process after a first draft, with the goal of:
+
 1. Removing prose-like stacking; improving layout and visual quality
 2. Ensuring readability, tappability, and usability on small screens
 3. Passing both script and model validation without violating user requirements
 
 ## End-to-End Flow
+
 After the first draft is written to disk, execute the following flow by default:
+
 1. Read the on-disk file (review based on file, do not start a new draft)
 2. Run the script validation (`scripts/validate_a2ui.py`)
 3. If it fails, fix the original file directly and re-run until it passes
@@ -17,7 +21,9 @@ After the first draft is written to disk, execute the following flow by default:
 7. Only after the script passes and model review is complete can delivery happen
 
 ## Round Checklist (Every Round)
+
 Check the following universal items every round:
+
 - Has the mode been clearly identified: `DTO Component` / `Non-DTO Component` / `Non-DTO Page`
 - Can all data paths be found in the `dataModel`
 - Are any banned advanced components, unsupported style properties, or non-reproducible hard-coded values used
@@ -34,7 +40,9 @@ Check the following universal items every round:
 - For full pages: is there obvious "collage-style" color palette jumping? Do the hero, main body sections, and night/chart/CTA areas belong to the same color band system
 
 ## Page Palette Review
+
 When the task is `Non-DTO Page`, after the script first passes, perform an additional "page palette coherence focused review":
+
 1. Ignore images; look only at component background colors, text colors, button colors, and tag colors
 2. Judge whether the page looks like one cohesive work, not multiple templates stitched together
 3. Focus checks:
@@ -49,6 +57,7 @@ When the task is `Non-DTO Page`, after the script first passes, perform an addit
    - Finally, preserve one necessary dark opening area if absolutely needed
 
 Experience thresholds:
+
 - The full page defaults to allowing at most `1` clear dark opening area
 - If the `hero` is already dark, avoid multiple independent dark large sections after it
 - If the user has not explicitly requested strong contrast, default to "unified" over "contrasting"
@@ -56,6 +65,7 @@ Experience thresholds:
 ## Mode-Specific Checks
 
 ### For `Component/Card` (DTO + Non-DTO)
+
 - Is height within the single-screen `1/3` budget, avoiding page-sized large cards
 - Are main sections converged to `2–3` or fewer; is primary info focused enough
 - Is there a double card shell: `Card` outer shell exists, and inner layer adds another full visual shell
@@ -71,7 +81,9 @@ Experience thresholds:
 - Is horizontal scrolling used only for local horizontal consumption areas, not for main content areas
 
 ## Protected Content Wrap Review
+
 For any horizontal layout, during the model review phase after the script first passes, perform an additional "protected content abnormal wrapping focused review":
+
 1. List the protected content in the current section:
    - CTA label text
    - Status words / short badges
@@ -88,11 +100,13 @@ For any horizontal layout, during the model review phase after the script first 
    - Only then truncate weak information
 
 Focused anti-patterns:
+
 - Short CTAs like "Book Now" being cut into two lines by a narrow button
 - Short values like `4.9`, `22:30`, `¥268` being compressed into fragments by fixed-width columns
 - Left-side long description still fully expanded while the right-side rating column or button column has already broken
 
 ### For `DTO Component` Only
+
 - Is the Python entry fixed as `build_component_payload_from_dto`
 - Do `*_components.json` and `*_datamodel.json` come directly from running Python
 - Are `required` and `optional` fields clearly distinguished
@@ -104,22 +118,28 @@ Focused anti-patterns:
 - Are `openStatus/openStatusCode/status/openTime/*` combined into readable status copy, not single-field output
 
 ## Validation Script
+
 Script location:
+
 - [`scripts/validate_a2ui.py`](scripts/validate_a2ui.py)
 
 Common invocations:
+
 - `python scripts/validate_a2ui.py components.json datamodel.json`
 - `python scripts/validate_a2ui.py combined.md`
 - `python scripts/validate_a2ui.py components.json datamodel.json overrides.json`
 - `python scripts/validate_a2ui.py combined.md overrides.json`
 
 ## User Requirement First (Targeted Override)
+
 When a user's explicit requirement conflicts with the default specification:
+
 1. Satisfy the user's explicit requirement first
 2. Exempt only the conflicting check items (minimum scope)
 3. Keep all other checks enabled
 
 Recommended `overrides.json`:
+
 ```json
 {
   "userRequirementFirst": true,

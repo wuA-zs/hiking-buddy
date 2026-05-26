@@ -41,7 +41,7 @@ export function StreamingText({ message, onAGenUIAction }: Props) {
         if (content.type === "text") {
           return content.text ? (
             <View key={`${message.id}-text-${index}`} style={styles.textRow}>
-              <Text style={[styles.assistantText, { color: Colors.textPrimary }]}>{content.text}</Text>
+              <Text style={[styles.assistantText, { color: Colors.textPrimary }]}>{formatDisplayText(content.text)}</Text>
               <Animated.Text style={[styles.cursor, { opacity: cursorOpacity, color: Colors.primary }]}>|</Animated.Text>
             </View>
           ) : null;
@@ -53,6 +53,10 @@ export function StreamingText({ message, onAGenUIAction }: Props) {
       })}
     </AssistantBubble>
   );
+}
+
+function formatDisplayText(text: string): string {
+  return text.replace(/\*\*(.*?)\*\*/g, "$1").replace(/`([^`]+)`/g, "$1");
 }
 
 const styles = StyleSheet.create({

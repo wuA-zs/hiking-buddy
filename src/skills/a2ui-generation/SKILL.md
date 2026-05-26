@@ -1,6 +1,6 @@
 ---
 name: a2ui-generation
-description: Design and generate official A2UI v0.9 `updateComponents` and `updateDataModel` payloads for three modes: DTO component, non-DTO component, and non-DTO page. Use when asked to create or refine A2UI cards, components, or pages from DTO/JSON/business data, generate Python transformer code for DTO-driven components, iterate on existing A2UI output files by diff, improve mobile UI quality, or validate A2UI rules such as `surfaceId`, component id `root`, path binding, and component-vs-page boundaries.
+description: Design and generate A2UI `updateComponents` and `updateDataModel` payloads for three modes: DTO component, non-DTO component, and non-DTO page. Use when asked to create or refine A2UI cards, components, or pages from DTO/JSON/business data, generate Python transformer code for DTO-driven components, iterate on existing A2UI output files by diff, improve mobile UI quality, or validate A2UI rules such as `surfaceId`, `root`, path binding, and component-vs-page boundaries.
 ---
 
 # A2UI Generation
@@ -39,7 +39,7 @@ Before entering mode selection, determine whether the user input is an **informa
 - Main sections ≤ 3
 - Body text ≤ 2 paragraphs; each paragraph ≤ 3 lines
 - **FORBIDDEN**: Dynamic `List` child templates (i.e., `children.componentId`-driven template rows such as `tips_item_template`) — this is a detail-page structure, not a summary card
-- **FORBIDDEN**: Full-width hero image (`aspect-ratio: 16/9 + width: 100%`) — this is a page header, not a card element
+- **FORBIDDEN**: Full-width hero image (`aspect-ratio: 16/9` + `width: 100%`) — this is a page header, not a card element
 - **FORBIDDEN**: Expanding the card into an article or content detail page (multiple long body paragraphs + full lists)
 - Total card height must not exceed 2/3 of screen height
 
@@ -55,35 +55,10 @@ Before entering mode selection, determine whether the user input is an **informa
 - [ ] Total height within 2/3 screen?
 If any item fails → converge first or escalate to page explicitly. Never bypass.
 
-## Output Format for Chat Agent
-
-Only emit official A2UI v0.9 protocol messages in the payload. The payload must be `createSurface`, `updateComponents`, `updateDataModel`, `deleteSurface`, or a list of those messages.
-
-在聊天中输出一个完整的 `agenui` 围栏代码块：
-
-```agenui
-{
-  "type": "agenui",
-  "payload": {
-    "version": "v0.9",
-    "updateComponents": {
-      "surfaceId": "card",
-      "components": [...]
-    },
-    "updateDataModel": {
-      "surfaceId": "card",
-      "path": "/data",
-      "value": {...}
-    }
-  }
-}
-```
-
-App 会剥离 `{ type: "agenui", payload: ... }` 包装，将 `payload` 渲染为 A2UI 卡片气泡。普通对话用文字回复，仅在需要结构化 UI 时使用 `agenui`。
-
 ## Mode Selection
 
 Before starting, determine:
+
 1. Does the user want a `component/card` or a `full page`?
 2. Has the user provided a DTO?
 
@@ -94,15 +69,18 @@ Then enter exactly one of the following three modes:
 ### Mode 1: DTO Component
 
 Applicable when:
+
 - The user has provided a DTO
 - The user wants a component / card
 
 Deliverables:
+
 1. Python transformer code
 2. `updateComponents` JSON
 3. `updateDataModel` JSON
 
 Unified entry function:
+
 ```python
 def build_component_payload_from_dto(dto: dict) -> tuple[dict, dict]:
     ...
@@ -111,32 +89,39 @@ def build_component_payload_from_dto(dto: dict) -> tuple[dict, dict]:
 ### Mode 2: Non-DTO Component
 
 Applicable when:
+
 - The user has not provided a DTO
 - The user wants a component / card
 
 Deliverables:
+
 1. `updateComponents` JSON
 2. `updateDataModel` JSON
 
 Mandatory order (must not be reversed):
+
 1. Output UI layout (`updateComponents`) first
 2. Output data (`updateDataModel`) second
 
 ### Mode 3: Non-DTO Page
 
 Applicable when:
+
 - The user has not provided a DTO
 - The user wants a full page
 
 Deliverables:
+
 1. `updateComponents` JSON
 2. `updateDataModel` JSON
 
 Mandatory order (must not be reversed):
+
 1. Output UI layout (`updateComponents`) first
 2. Output data (`updateDataModel`) second
 
 Supplementary rules:
+
 - Only the three modes above are defined by default
 - If the user provides a DTO but explicitly wants a full page, do not silently apply one of these modes; ask first whether to design the page as DTO-driven
 
@@ -152,10 +137,38 @@ Do not read all sub-documents by default. Load only what the current task requir
 | Bug fix / review / iterating on existing artifacts | [`docs/review-validation.md`](docs/review-validation.md) | Whichever doc is directly related to the issue |
 
 Additional notes:
+
 - Load [`docs/component-catalog.md`](docs/component-catalog.md) when you need to verify atomic components, charts, fields, allowed values, or style whitelists
 - Load [`docs/data-binding.md`](docs/data-binding.md) when you need to verify path binding, template binding, or relative path rules
 - Load [`docs/component-design.md`](docs/component-design.md) when you need to verify component height budgets, card content budgets, or multi-column text budgets
 - Load [`docs/page-design.md`](docs/page-design.md) when you need to verify full-page structure, layout composition, or page-level sectioning
+
+## Output Persistence
+
+Final artifacts should be written to files by default, and the user should be told the paths explicitly.
+
+Priority order:
+
+1. If the user specifies a directory or filename, save according to that
+2. If the user provides an existing artifact directory, prefer saving near that context
+3. Otherwise choose a clear, sensible, easy-to-find location
+
+Default file naming:
+
+- `*_components.json`
+- `*_datamodel.json`
+- `*_transformer.py` or `*_vo.py`
+
+Non-DTO mode write order (mandatory):
+
+1. Generate and save `*_components.json` first
+2. Generate and save `*_datamodel.json` second
+
+To save tokens:
+
+- Write the first draft to disk immediately after generation
+- If the user continues modifying, iterate on the existing file by default
+- Each round of changes should edit the file and work from a diff — do not repaste the entire JSON in the conversation
 
 ## Workflow
 
@@ -163,8 +176,17 @@ Additional notes:
 2. Load only the sub-documents the current task truly needs
 3. Before formal output, explicitly list the layout rationale: at minimum describe the main sections, visual focal point, information rhythm, key horizontal relationships, and the role of images
 4. Based on that layout rationale, draft an internal first version, then perform at least `1` explicit design improvement before proceeding to formal output
-5. Output the first draft formally in an `agenui` fenced code block
-6. At delivery, if placeholder links were used, explicitly remind the user to replace them
+5. Output the first draft formally and write it to disk immediately (non-DTO mode: components before datamodel, mandatory)
+6. Run [`scripts/validate_a2ui.py`](scripts/validate_a2ui.py) immediately; if it fails, fix the file directly and re-run until it passes
+7. Only after the script passes for the first time, perform `1–2` rounds of model-level design review and improvement on the on-disk files
+8. During model review rounds: address palette coherence, information hierarchy, horizontal relationships, and premium feel; also perform a dedicated "protected content abnormal wrapping" check on all horizontal layouts — prioritize checking whether short phrases, CTAs, ratings, times, and prices are being squeezed and broken by narrow fixed widths
+9. If the model review modifies files, re-run the validation script; deliver only after it passes again
+10. At delivery, clearly state the output file paths; if placeholder links were used, explicitly remind the user to replace them
+
+When a "user explicitly required item conflicts with a rule":
+
+- Use `overrides.json` to exempt only the conflicting checks at minimum scope
+- Exempt only the relevant check; do not disable other validations as collateral
 
 ## Non-Negotiables
 
@@ -177,7 +199,7 @@ Only truly irreplaceable business invariants that scripts cannot fully substitut
 - When semantic meaning depends on a combination of fields (e.g., status + time), perform the combination mapping first, then decide whether to display or omit
 - `Component/card` mode must not silently become page-like; do not deliver a near-full-screen large card
 - Component mode content should converge first; escalate to page only when convergence fails, and do so explicitly
-- **Card hard gate (self-check before generating any JSON)**: main sections ≤ 3; no dynamic `List` sub-templates (i.e., `children.componentId`-driven template rows); no full-width hero image (`aspect-ratio: 16/9 + width: 100%`); body paragraphs ≤ 2; if any item fails, converge first or escalate to page explicitly — bypassing is not allowed
+- **Card hard gate (self-check before generating any JSON)**: main sections ≤ 3; no dynamic `List` sub-templates (i.e., `children.componentId`-driven template rows); no full-width hero image (`aspect-ratio: 16/9` + `width: 100%`); body paragraphs ≤ 2; if any item fails, converge first or escalate to page explicitly — bypassing is not allowed
 - **Information summary card scenario (query/search-term driven)**: structure is locked to `Title → Core attributes (1–3) → Brief summary (≤ 2 lines) → Tag group → CTA`; expanding into article narrative structure is forbidden
 - **Tag group and CTA must be in separate rows**: when a card bottom has both a tag group (>= 2 tags) and a CTA button, they must be separated using Column (tag row first, CTA below); placing them in the same Row is forbidden — even flex-wrap and flex-shrink cannot prevent the CTA from overflowing and being clipped
 - **⚠️ English model content inflation guard**: When query input is in English, the model tends to generate long-form article content. For every card task, actively resist generating: multiple long body paragraphs, full visitor tip lists, narrative sections, or any structure that resembles a detail page. If you find yourself writing more than 2 paragraphs of body text, stop and converge immediately
@@ -186,6 +208,7 @@ Only truly irreplaceable business invariants that scripts cannot fully substitut
 - Protected content — short phrases, CTAs, rating values, prices, times — must not wrap or fragment due to a fixed narrow width
 - `CTA` buttons default to content-driven width via `padding + border-radius`; do not write a fixed narrow width unless explicit alignment requirements exist and readability has been verified
 - When design requires images, do not fabricate non-existent image URLs
+- After the first draft, always iterate on the on-disk file; do not regenerate the entire artifact each round
 - Before formal output, the layout rationale must be explicitly listed; skipping layout planning and jumping straight to JSON is not allowed
 - The layout rationale must cover at minimum: main sections, visual focal point, content rhythm, key component relationships, and the role of images/charts
 - Before formal output, at least `1` explicit improvement round is required; the first version in your head must not be delivered directly as the final first draft

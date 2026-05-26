@@ -3,6 +3,7 @@
 ## Protocol Shape
 
 A2UI separates structure from data:
+
 - `updateComponents`: component tree, layout, styles, binding paths
 - `updateDataModel`: data content corresponding to binding paths
 - Dynamic content is bound via `{"path": "..."}`
@@ -109,7 +110,7 @@ Dialog. `trigger` is the triggering component id; `content` is the dialog body c
 
 #### `RichText`
 
-Supported HTML tags: `<b>`, `<i>`, `<u>`, `<br>`, `<blockquote>`, `<del>`, `<s>`, `<sub>`, `<sup>`, `<strong>`, `<em>`, `<code>`, `<a href="...">`. `linksEnable` defaults to `true`.
+Supported HTML tags: `<font>`, `<color>`, `<a>`, `<br>`, `<blockquote>`, `<i>`, `<u>`, `<strike>`, `<sub>`, `<sup>`, `<strong>`, `<b>`, `<small>`, `<img>`. `linksEnable` defaults to `true`.
 
 ```json
 {"id": "rt1", "component": "RichText", "text": {"path": "/data/richContent"}, "variant": "h1|h2|h3|h4|h5|body|caption", "linksEnable": true}
