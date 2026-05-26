@@ -20,6 +20,8 @@ import type {
 import { generateId } from "./types";
 import { formatSkillsForSystemPrompt } from "./skills";
 import type { ChatChunk } from "./openai-types";
+import { buildChatCompletionRequest } from "./request";
+import { parseNonStreamingResponse } from "./response";
 import { parseSSEText } from "./sse";
 import { runAgentTool } from "./tool-runner";
 
@@ -27,7 +29,6 @@ type EventListener = (event: AgentEvent) => void;
 
 const REQUEST_TIMEOUT_MS = 60_000;
 const TOOL_TIMEOUT_MS = 30_000;
-const MAX_HISTORY_TURNS = 20; // Keep last N messages (excl. system)
 
 // 鈹€鈹€ SSE Stream Chunk 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
@@ -156,45 +157,6 @@ export class Agent {
     }
   }
 
-  private parseNonStreamingResponse(text: string, message: AssistantMessage): void {
-    try {
-      const json = JSON.parse(text);
-      const content = json.choices?.[0]?.message?.content;
-      if (content) {
-        message.content = [{ type: "text", text: content }];
-      }
-      const finishReason = json.choices?.[0]?.finish_reason;
-      if (finishReason === "tool_calls") {
-        message.stopReason = "toolUse";
-      } else if (finishReason === "length") {
-        message.stopReason = "length";
-      }
-      // Tool calls
-      const toolCalls = json.choices?.[0]?.message?.tool_calls;
-      if (Array.isArray(toolCalls)) {
-        for (const tc of toolCalls) {
-          let args: Record<string, unknown> = {};
-          try { args = JSON.parse(tc.function?.arguments || "{}"); } catch {}
-          message.content.push({
-            type: "toolCall",
-            id: tc.id || "",
-            name: tc.function?.name || "",
-            arguments: args,
-          });
-        }
-      }
-      if (json.usage) {
-        message.usage = {
-          inputTokens: json.usage.prompt_tokens ?? 0,
-          outputTokens: json.usage.completion_tokens ?? 0,
-        };
-      }
-    } catch {
-      message.stopReason = "error";
-      message.content = [{ type: "text", text: `瑙ｆ瀽鍝嶅簲澶辫触: ${text.slice(0, 200)}` }];
-    }
-  }
-
   private async streamAssistant(): Promise<AssistantMessage> {
     const url = `${this.baseURL}/chat/completions`;
     const body = this.buildRequestBody();
@@ -254,7 +216,7 @@ export class Agent {
         if (text.includes("data: ")) {
           parseSSEText(text, message);
         } else {
-          this.parseNonStreamingResponse(text, message);
+          parseNonStreamingResponse(text, message);
         }
         await this.emit({ type: "message_update", message });
         return message;
@@ -391,79 +353,13 @@ export class Agent {
   // 鈹€鈹€ OpenAI Request Body 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   private buildRequestBody(): Record<string, unknown> {
-    const messages: Array<Record<string, unknown>> = [
-      { role: "system", content: this.systemPrompt },
-    ];
-
-    // Truncate history to avoid token overflow
-    const recent = this.messages.slice(-MAX_HISTORY_TURNS * 2);
-
-    for (const msg of recent) {
-      if (msg.role === "user") {
-        const hasImage = msg.content.some((c) => c.type === "image");
-        if (hasImage) {
-          messages.push({
-            role: "user",
-            content: msg.content.map((c) => {
-              if (c.type === "text") return { type: "text", text: c.text };
-              return {
-                type: "image_url",
-                image_url: { url: `data:${c.mimeType};base64,${c.data}` },
-              };
-            }),
-          });
-        } else {
-          messages.push({
-            role: "user",
-            content: msg.content.filter((c): c is { type: "text"; text: string } => c.type === "text").map((c) => c.text).join(""),
-          });
-        }
-      } else if (msg.role === "assistant") {
-        const textContent = msg.content
-          .filter((c) => c.type === "text")
-          .map((c) => c.text)
-          .join("");
-        const content: string | null = textContent || null;
-
-        const toolCalls = msg.content
-          .filter((c) => c.type === "toolCall")
-          .map((c) => ({
-            id: c.id,
-            type: "function",
-            function: { name: c.name, arguments: JSON.stringify(c.arguments) },
-          }));
-
-        const entry: Record<string, unknown> = { role: "assistant" };
-        if (content) entry.content = content;
-        if (toolCalls.length > 0) entry.tool_calls = toolCalls;
-        if (!content && toolCalls.length === 0) entry.content = "";
-        messages.push(entry);
-      } else {
-        // toolResult
-        messages.push({
-          role: "tool",
-          tool_call_id: msg.toolCallId,
-          content: msg.content.map((c) => c.text).join("\n"),
-        });
-      }
-    }
-
-    const tools = Array.from(this.tools.values()).map((tool) => ({
-      type: "function",
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-      },
-    }));
-
-    return {
+    return buildChatCompletionRequest({
+      systemPrompt: this.systemPrompt,
+      messages: this.messages,
+      tools: this.tools.values(),
       model: this.model,
-      max_tokens: this.maxTokens,
-      messages,
-      ...(tools.length > 0 ? { tools } : {}),
-      stream: true,
-    };
+      maxTokens: this.maxTokens,
+    });
   }
 
   // 鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
