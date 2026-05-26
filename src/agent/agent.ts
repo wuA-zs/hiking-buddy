@@ -1,5 +1,5 @@
-/**
- * Agent class — simplified from pi-agent-core
+﻿/**
+ * Agent class 鈥?simplified from pi-agent-core
  *
  * Manages conversation state, streaming events, and tool execution.
  * Uses OpenAI-compatible chat completions API via fetch.
@@ -7,15 +7,12 @@
 
 import { fetch } from "expo/fetch";
 import type {
-  AGenUIContent,
   AgentConfig,
   AgentEvent,
   AgentMessage,
   AgentTool,
-  AgentToolResult,
   AssistantMessage,
   Skill,
-  TextContent,
   ToolCall,
   ToolResultMessage,
   UserMessage,
@@ -23,6 +20,10 @@ import type {
 import { generateId } from "./types";
 import { formatSkillsForSystemPrompt } from "./skills";
 import { formatAGenUIClientCapabilitiesForPrompt } from "../agenui/capabilities";
+import { normalizeAGenUIContent } from "./agenui-content";
+import type { ChatChunk } from "./openai-types";
+import { parseSSEText } from "./sse";
+import { runAgentTool } from "./tool-runner";
 
 type EventListener = (event: AgentEvent) => void;
 
@@ -30,27 +31,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 const TOOL_TIMEOUT_MS = 30_000;
 const MAX_HISTORY_TURNS = 20; // Keep last N messages (excl. system)
 
-// ── SSE Stream Chunk ──────────────────────────────────────────
-
-interface ChatChunk {
-  choices?: Array<{
-    delta?: {
-      content?: string;
-      tool_calls?: Array<{
-        index: number;
-        id?: string;
-        function?: { name?: string; arguments?: string };
-      }>;
-    };
-    finish_reason?: string;
-  }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
-}
-
-type AssistantContent = AssistantMessage["content"][number];
-
-const AGENUI_FENCE_RE = /```agenui(?:\s+json)?\s*\n?([\s\S]*?)```/gi;
-const JSON_FENCE_RE = /```json\s*\n?([\s\S]*?)```/gi;
+// 鈹€鈹€ SSE Stream Chunk 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export class Agent {
   private messages: AgentMessage[] = [];
@@ -79,7 +60,7 @@ export class Agent {
     }
   }
 
-  // ── Public API ──────────────────────────────────────────────
+  // 鈹€鈹€ Public API 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   subscribe(listener: EventListener): () => void {
     this.listeners.add(listener);
@@ -132,7 +113,7 @@ export class Agent {
     return this.skills;
   }
 
-  // ── Core Loop ───────────────────────────────────────────────
+  // 鈹€鈹€ Core Loop 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   private async run(): Promise<void> {
     this.abortController = new AbortController();
@@ -183,7 +164,7 @@ export class Agent {
       const content = json.choices?.[0]?.message?.content;
       if (content) {
         message.content = [{ type: "text", text: content }];
-        this.normalizeAGenUIContent(message);
+        normalizeAGenUIContent(message);
       }
       const finishReason = json.choices?.[0]?.finish_reason;
       if (finishReason === "tool_calls") {
@@ -211,10 +192,10 @@ export class Agent {
           outputTokens: json.usage.completion_tokens ?? 0,
         };
       }
-      this.normalizeAGenUIContent(message);
+      normalizeAGenUIContent(message);
     } catch {
       message.stopReason = "error";
-      message.content = [{ type: "text", text: `解析响应失败: ${text.slice(0, 200)}` }];
+      message.content = [{ type: "text", text: `瑙ｆ瀽鍝嶅簲澶辫触: ${text.slice(0, 200)}` }];
     }
   }
 
@@ -239,7 +220,7 @@ export class Agent {
       const timeoutId = setTimeout(() => this.abortController?.abort(), REQUEST_TIMEOUT_MS);
       const signal = this.abortController?.signal;
 
-      let response: Response;
+      let response: Awaited<ReturnType<typeof fetch>>;
       try {
         response = await fetch(url, {
           method: "POST",
@@ -262,7 +243,7 @@ export class Agent {
           : response.status === 429
             ? "请求太频繁，请稍后再试。"
             : response.status >= 500
-              ? "服务器暂时不可用，请稍后再试。"
+              ? "服务暂时不可用，请稍后再试。"
               : `请求失败 (${response.status})，请检查设置后重试。`;
         message.content = [{ type: "text", text: userMsg }];
         message.errorMessage = `HTTP ${response.status}: ${errText.slice(0, 200)}`;
@@ -275,7 +256,7 @@ export class Agent {
         const text = await response.text();
         // If response contains SSE lines, parse them; otherwise treat as plain JSON
         if (text.includes("data: ")) {
-          this.parseSSEText(text, message);
+          parseSSEText(text, message);
         } else {
           this.parseNonStreamingResponse(text, message);
         }
@@ -363,7 +344,7 @@ export class Agent {
       }
 
       // Finalize tool calls
-      this.normalizeAGenUIContent(message);
+      normalizeAGenUIContent(message);
       for (const [, buf] of toolCallBuffers) {
         let args: Record<string, unknown> = {};
         try {
@@ -403,62 +384,16 @@ export class Agent {
       };
     }
 
-    await this.emit({
-      type: "tool_execution_start",
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      args: toolCall.arguments,
+    return runAgentTool({
+      tool,
+      toolCall,
+      signal: this.abortController?.signal,
+      timeoutMs: TOOL_TIMEOUT_MS,
+      emit: (event) => this.emit(event),
     });
-
-    let result: AgentToolResult;
-    let isError = false;
-
-    try {
-      // Wrap tool execution with a timeout
-      const toolPromise = tool.execute(
-        toolCall.id,
-        toolCall.arguments,
-        this.abortController?.signal,
-        (partial) => {
-          this.emit({
-            type: "tool_execution_update",
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            partialResult: partial,
-          });
-        },
-      );
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`工具执行超时 (${TOOL_TIMEOUT_MS / 1000}s)`)), TOOL_TIMEOUT_MS),
-      );
-      result = await Promise.race([toolPromise, timeoutPromise]);
-    } catch (error) {
-      result = {
-        content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
-      };
-      isError = true;
-    }
-
-    await this.emit({
-      type: "tool_execution_end",
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      result,
-      isError,
-    });
-
-    return {
-      id: generateId(),
-      role: "toolResult",
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      content: result.content,
-      isError,
-      timestamp: Date.now(),
-    };
   }
 
-  // ── OpenAI Request Body ─────────────────────────────────────
+  // 鈹€鈹€ OpenAI Request Body 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   private buildRequestBody(): Record<string, unknown> {
     const messages: Array<Record<string, unknown>> = [
@@ -537,119 +472,7 @@ export class Agent {
     };
   }
 
-  // ── Helpers ─────────────────────────────────────────────────
-
-  private normalizeAGenUIContent(message: AssistantMessage): void {
-    const normalized: AssistantContent[] = [];
-    let changed = false;
-
-    for (const content of message.content) {
-      if (content.type !== "text") {
-        normalized.push(content);
-        continue;
-      }
-
-      const pieces = this.splitAGenUIBlocks(content.text);
-      if (pieces.length === 1 && pieces[0].type === "text" && pieces[0].text === content.text) {
-        normalized.push(content);
-        continue;
-      }
-
-      changed = true;
-      normalized.push(...pieces);
-    }
-
-    if (changed) {
-      message.content = normalized;
-    }
-  }
-
-  private splitAGenUIBlocks(text: string): (TextContent | AGenUIContent)[] {
-    const wholePayload = this.extractAGenUIPayload(text);
-    if (wholePayload) {
-      return [{ type: "agenui", id: generateId(), payload: wholePayload }];
-    }
-
-    const agenuiPieces = this.splitFencedAGenUIBlocks(text, AGENUI_FENCE_RE, true);
-    if (agenuiPieces) return agenuiPieces;
-
-    return this.splitFencedAGenUIBlocks(text, JSON_FENCE_RE, false) ?? [{ type: "text", text }];
-  }
-
-  private splitFencedAGenUIBlocks(
-    text: string,
-    pattern: RegExp,
-    trustFenceLanguage: boolean,
-  ): (TextContent | AGenUIContent)[] | null {
-    pattern.lastIndex = 0;
-    const pieces: (TextContent | AGenUIContent)[] = [];
-    let lastIndex = 0;
-    let changed = false;
-    let match: RegExpExecArray | null;
-
-    while ((match = pattern.exec(text)) !== null) {
-      const rawPayload = match[1]?.trim() ?? "";
-      const payload = trustFenceLanguage ? this.normalizeAGenUIPayload(rawPayload) : this.extractAGenUIPayload(rawPayload);
-      if (!payload) continue;
-
-      if (match.index > lastIndex) {
-        pieces.push({ type: "text", text: text.slice(lastIndex, match.index) });
-      }
-      pieces.push({ type: "agenui", id: generateId(), payload });
-      lastIndex = match.index + match[0].length;
-      changed = true;
-    }
-
-    if (!changed) return null;
-    if (lastIndex < text.length) {
-      pieces.push({ type: "text", text: text.slice(lastIndex) });
-    }
-    return pieces.filter((piece) => piece.type !== "text" || piece.text.length > 0);
-  }
-
-  private extractAGenUIPayload(text: string): string | null {
-    try {
-      const trimmed = text.trim();
-      const parsed = JSON.parse(trimmed);
-      if (this.isAGenUIWrapper(parsed)) {
-        return this.normalizeAGenUIPayload(trimmed);
-      }
-      return this.looksLikeAGenUI(parsed) ? trimmed : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private normalizeAGenUIPayload(payload: string): string | null {
-    try {
-      const parsed = JSON.parse(payload);
-      if (this.isAGenUIWrapper(parsed)) {
-        const innerPayload = parsed.payload;
-        const normalizedPayload = typeof innerPayload === "string" ? innerPayload : JSON.stringify(innerPayload);
-        return this.extractAGenUIPayload(normalizedPayload);
-      }
-      return this.looksLikeAGenUI(parsed) ? payload : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private looksLikeAGenUI(value: unknown): boolean {
-    if (Array.isArray(value)) {
-      return value.length > 0 && value.every((item) => this.looksLikeAGenUI(item));
-    }
-    if (!this.isRecord(value)) return false;
-
-    return "createSurface" in value || "updateComponents" in value || "updateDataModel" in value || "deleteSurface" in value;
-  }
-
-  private isAGenUIWrapper(value: unknown): value is { type: "agenui"; payload: unknown } {
-    return this.isRecord(value) && value.type === "agenui" && "payload" in value;
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
-  }
+  // 鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   private async emit(event: AgentEvent): Promise<void> {
     for (const listener of this.listeners) {
@@ -658,89 +481,6 @@ export class Agent {
       } catch {
         // Swallow listener errors
       }
-    }
-  }
-
-  /**
-   * Parse a full SSE text response (fallback for runtimes without ReadableStream).
-   * Extracts content, tool calls, and usage from the concatenated SSE lines.
-   */
-  private parseSSEText(text: string, message: AssistantMessage): void {
-    const toolCallBuffers: Map<number, { id: string; name: string; arguments: string }> = new Map();
-
-    for (const line of text.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data: ")) continue;
-      const data = trimmed.slice(6);
-      if (data === "[DONE]") continue;
-
-      let chunk: ChatChunk;
-      try {
-        chunk = JSON.parse(data);
-      } catch {
-        continue;
-      }
-
-      const delta = chunk.choices?.[0]?.delta;
-
-      // Text content
-      if (delta?.content) {
-        const lastBlock = message.content[message.content.length - 1];
-        if (lastBlock && lastBlock.type === "text") {
-          lastBlock.text += delta.content;
-        } else {
-          message.content.push({ type: "text", text: delta.content });
-        }
-      }
-
-      // Tool calls
-      if (delta?.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          const idx = tc.index;
-          if (!toolCallBuffers.has(idx)) {
-            toolCallBuffers.set(idx, {
-              id: tc.id || "",
-              name: tc.function?.name || "",
-              arguments: "",
-            });
-          }
-          const buf = toolCallBuffers.get(idx)!;
-          if (tc.id) buf.id = tc.id;
-          if (tc.function?.name) buf.name = tc.function.name;
-          if (tc.function?.arguments) buf.arguments += tc.function.arguments;
-        }
-      }
-
-      // Usage
-      if (chunk.usage) {
-        message.usage = {
-          inputTokens: chunk.usage.prompt_tokens ?? 0,
-          outputTokens: chunk.usage.completion_tokens ?? 0,
-        };
-      }
-
-      // Finish reason
-      const finishReason = chunk.choices?.[0]?.finish_reason;
-      if (finishReason === "tool_calls") {
-        message.stopReason = "toolUse";
-      } else if (finishReason === "length") {
-        message.stopReason = "length";
-      }
-    }
-
-    // Finalize tool calls
-    this.normalizeAGenUIContent(message);
-    for (const [, buf] of toolCallBuffers) {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(buf.arguments || "{}");
-      } catch {}
-      message.content.push({
-        type: "toolCall",
-        id: buf.id,
-        name: buf.name,
-        arguments: args,
-      });
     }
   }
 

@@ -1,235 +1,62 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React from "react";
 import {
-  View,
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useTheme, Spacing, FontSize, Radius, Shadows } from "../src/lib/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppIcon } from "../src/components/AppIcon";
-import { vfs } from "../src/services/vfs";
+import { FontSize, Radius, Shadows, Spacing, useTheme } from "../src/lib/theme";
 import type { VFSNode } from "../src/services/vfs-types";
+import { useFileBrowser } from "../src/features/files";
 
 export default function FilesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors: Colors, isDark } = useTheme();
-
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [nodes, setNodes] = useState<VFSNode[]>([]);
-  const [breadcrumbs, setBreadcrumbs] = useState<VFSNode[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Editor state
-  const [editingFile, setEditingFile] = useState<VFSNode | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [editDirty, setEditDirty] = useState(false);
-
-  // Rename state
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameText, setRenameText] = useState("");
-
-  // Create dialog
-  const [creating, setCreating] = useState<"file" | "folder" | null>(null);
-  const [newName, setNewName] = useState("");
-
-  // Load current folder contents
-  const loadFolder = useCallback(async (folderId: string | null) => {
-    setLoading(true);
-    try {
-      const children = await vfs.list(folderId);
-      const ancestors = await vfs.getAncestors(folderId);
-      setNodes(children);
-      setBreadcrumbs(ancestors);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Refresh on focus
-  useFocusEffect(
-    useCallback(() => {
-      // Close editor if navigating back
-      if (!editingFile) {
-        loadFolder(currentFolderId);
-      }
-    }, [currentFolderId, editingFile, loadFolder]),
-  );
-
-  // Initial load
-  useEffect(() => {
-    loadFolder(currentFolderId);
-  }, [currentFolderId, loadFolder]);
-
-  // --- Actions ---
-
-  function navigateTo(folderId: string | null) {
-    setEditingFile(null);
-    setEditDirty(false);
-    setCurrentFolderId(folderId);
-  }
-
-  function openFile(file: VFSNode) {
-    setEditingFile(file);
-    setEditContent(file.content ?? "");
-    setEditDirty(false);
-  }
-
-  function closeEditor() {
-    if (editDirty) {
-      Alert.alert("未保存的更改", "关闭编辑器将丢失未保存的更改。", [
-        { text: "取消", style: "cancel" },
-        {
-          text: "不保存",
-          style: "destructive",
-          onPress: () => {
-            setEditingFile(null);
-            setEditDirty(false);
-          },
-        },
-      ]);
-    } else {
-      setEditingFile(null);
-    }
-  }
-
-  async function saveFile() {
-    if (!editingFile) return;
-    try {
-      await vfs.update(editingFile.id, { content: editContent });
-      setEditDirty(false);
-      const updated = await vfs.getById(editingFile.id);
-      if (updated) setEditingFile(updated);
-      loadFolder(currentFolderId);
-    } catch (err) {
-      Alert.alert("保存失败", (err as Error).message);
-    }
-  }
-
-  function handleCreate(type: "file" | "folder") {
-    setCreating(type);
-    setNewName("");
-  }
-
-  async function confirmCreate() {
-    if (!creating || !newName.trim()) return;
-    try {
-      await vfs.create({
-        name: newName.trim(),
-        type: creating,
-        parentId: currentFolderId,
-        content: creating === "file" ? "" : undefined,
-      });
-      setCreating(null);
-      setNewName("");
-      loadFolder(currentFolderId);
-    } catch (err) {
-      Alert.alert("创建失败", (err as Error).message);
-    }
-  }
-
-  function startRename(node: VFSNode) {
-    setRenamingId(node.id);
-    setRenameText(node.name);
-  }
-
-  async function confirmRename() {
-    if (!renamingId || !renameText.trim()) return;
-    try {
-      await vfs.update(renamingId, { name: renameText.trim() });
-      setRenamingId(null);
-      setRenameText("");
-      loadFolder(currentFolderId);
-    } catch (err) {
-      Alert.alert("重命名失败", (err as Error).message);
-    }
-  }
-
-  function confirmDelete(node: VFSNode) {
-    const msg =
-      node.type === "folder"
-        ? `确定要删除文件夹"${node.name}"及其所有内容吗？`
-        : `确定要删除"${node.name}"吗？`;
-    Alert.alert("删除确认", msg, [
-      { text: "取消", style: "cancel" },
-      {
-        text: "删除",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await vfs.remove(node.id);
-            loadFolder(currentFolderId);
-          } catch (err) {
-            Alert.alert("删除失败", (err as Error).message);
-          }
-        },
-      },
-    ]);
-  }
-
-  function handleLongPress(node: VFSNode) {
-    Alert.alert(node.name, undefined, [
-      { text: "重命名", onPress: () => startRename(node) },
-      {
-        text: "删除",
-        style: "destructive",
-        onPress: () => confirmDelete(node),
-      },
-      { text: "取消", style: "cancel" },
-    ]);
-  }
-
-  // --- Render ---
+  const files = useFileBrowser();
 
   function renderItem({ item }: { item: VFSNode }) {
-    const isRenaming = renamingId === item.id;
+    const isRenaming = files.renamingId === item.id;
 
     return (
       <TouchableOpacity
         style={[styles.itemRow, { backgroundColor: Colors.surface, borderColor: Colors.border }]}
-        onPress={() =>
-          item.type === "folder" ? navigateTo(item.id) : openFile(item)
-        }
-        onLongPress={() => handleLongPress(item)}
-        activeOpacity={0.6}
+        onPress={() => (item.type === "folder" ? files.navigateTo(item.id) : files.openFile(item))}
+        onLongPress={() => files.handleLongPress(item)}
+        activeOpacity={0.7}
       >
-        <Text style={styles.itemIcon}>
-          {item.type === "folder" ? "📁" : "📄"}
-        </Text>
-
+        <AppIcon
+          name={item.type === "folder" ? "chevron-forward-outline" : "chatbubble-ellipses-outline"}
+          size={19}
+          color={Colors.primary}
+        />
         {isRenaming ? (
           <TextInput
             style={[styles.itemNameInput, { color: Colors.textPrimary, borderColor: Colors.primary }]}
-            value={renameText}
-            onChangeText={setRenameText}
+            value={files.renameText}
+            onChangeText={files.setRenameText}
             autoFocus
-            onSubmitEditing={confirmRename}
-            onBlur={confirmRename}
+            onSubmitEditing={files.confirmRename}
+            onBlur={files.confirmRename}
             returnKeyType="done"
           />
         ) : (
-          <View style={styles.itemInfo}>
-            <Text
-              style={[styles.itemName, { color: Colors.textPrimary }]}
-              numberOfLines={1}
-            >
+          <View style={styles.itemTextWrap}>
+            <Text style={[styles.itemName, { color: Colors.textPrimary }]} numberOfLines={1}>
               {item.name}
             </Text>
             <Text style={[styles.itemMeta, { color: Colors.textTertiary }]}>
-              {item.type === "folder"
-                ? new Date(item.updatedAt).toLocaleDateString("zh-CN")
-                : `${(item.content?.length ?? 0)} 字节`}
+              {item.type === "folder" ? "文件夹" : `${item.content?.length ?? 0} 字符`}
             </Text>
           </View>
         )}
@@ -237,200 +64,127 @@ export default function FilesScreen() {
     );
   }
 
-  // File editor view
-  if (editingFile) {
-    return (
-      <View style={[styles.container, { backgroundColor: Colors.bg }]}>
-        <StatusBar style={isDark ? "light" : "dark"} />
-
-        <View style={[styles.header, { paddingTop: insets.top + Spacing.sm, backgroundColor: Colors.bg }]}>
-          <TouchableOpacity
-            onPress={closeEditor}
-            style={styles.headerBtn}
-            accessibilityLabel="返回"
-          >
-            <AppIcon name="arrow-back" size={20} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: Colors.textPrimary }]} numberOfLines={1}>
-              {editingFile.name}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={saveFile}
-            style={[
-              styles.saveBtn,
-              {
-                backgroundColor: editDirty ? Colors.primary : Colors.border,
-              },
-            ]}
-            disabled={!editDirty}
-          >
-            <Text
-              style={[
-                styles.saveBtnText,
-                { color: editDirty ? Colors.textOnPrimary : Colors.textTertiary },
-              ]}
-            >
-              保存
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <TextInput
-          style={[styles.editor, { color: Colors.textPrimary, backgroundColor: Colors.surface }]}
-          value={editContent}
-          onChangeText={(t) => {
-            setEditContent(t);
-            setEditDirty(true);
-          }}
-          multiline
-          autoFocus
-          textAlignVertical="top"
-          placeholder="输入内容..."
-          placeholderTextColor={Colors.textTertiary}
-        />
-      </View>
-    );
-  }
-
-  // File browser view
   return (
-    <View style={[styles.container, { backgroundColor: Colors.bg }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: Colors.bg }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       <StatusBar style={isDark ? "light" : "dark"} />
-
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm, backgroundColor: Colors.bg }]}>
         <TouchableOpacity
-          onPress={() =>
-            currentFolderId === null ? router.back() : navigateTo(
-              breadcrumbs.length > 1
-                ? breadcrumbs[breadcrumbs.length - 2].id
-                : null,
-            )
-          }
-          style={styles.headerBtn}
+          onPress={() => router.back()}
+          style={[styles.iconBtn, { backgroundColor: Colors.surface, borderColor: Colors.border }]}
           accessibilityLabel="返回"
+          accessibilityRole="button"
         >
-          <AppIcon name="arrow-back" size={20} color={Colors.textPrimary} />
+          <AppIcon name="arrow-back" size={19} color={Colors.primary} />
         </TouchableOpacity>
-        <View style={styles.headerTitleWrap}>
-          <Text style={[styles.kicker, { color: Colors.textTertiary }]}>
-            文件管理
-          </Text>
-          <Text style={[styles.headerTitle, { color: Colors.textPrimary }]}>
-            {breadcrumbs.length > 0
-              ? breadcrumbs[breadcrumbs.length - 1].name
-              : "我的文件"}
-          </Text>
+        <View style={styles.headerText}>
+          <Text style={[styles.kicker, { color: Colors.textTertiary }]}>Files</Text>
+          <Text style={[styles.title, { color: Colors.textPrimary }]}>文件</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            onPress={() => handleCreate("folder")}
-            style={[styles.headerBtn, { backgroundColor: Colors.surface, borderColor: Colors.border }]}
+            onPress={() => files.handleCreate("folder")}
+            style={[styles.iconBtn, { backgroundColor: Colors.surface, borderColor: Colors.border }]}
             accessibilityLabel="新建文件夹"
+            accessibilityRole="button"
           >
-            <Text style={{ fontSize: 16 }}>📁</Text>
+            <AppIcon name="chevron-up" size={18} color={Colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => handleCreate("file")}
-            style={[styles.headerBtn, { backgroundColor: Colors.surface, borderColor: Colors.border }]}
+            onPress={() => files.handleCreate("file")}
+            style={[styles.iconBtn, { backgroundColor: Colors.primary, borderColor: Colors.primary }]}
             accessibilityLabel="新建文件"
+            accessibilityRole="button"
           >
-            <Text style={{ fontSize: 16 }}>📄</Text>
+            <AppIcon name="checkmark-circle-outline" size={18} color={Colors.textOnPrimary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Breadcrumb */}
-      {breadcrumbs.length > 0 && (
-        <View style={[styles.breadcrumb, { borderBottomColor: Colors.divider }]}>
-          <TouchableOpacity onPress={() => navigateTo(null)}>
-            <Text style={[styles.breadcrumbItem, { color: Colors.primary }]}>
-              根目录
-            </Text>
-          </TouchableOpacity>
-          {breadcrumbs.map((node) => (
-            <React.Fragment key={node.id}>
-              <Text style={{ color: Colors.textTertiary, marginHorizontal: 4 }}>
-                /
+      <View style={styles.breadcrumbs}>
+        <TouchableOpacity onPress={() => files.navigateTo(null)}>
+          <Text style={[styles.breadcrumbText, { color: Colors.primary }]}>根目录</Text>
+        </TouchableOpacity>
+        {files.breadcrumbs.map((crumb) => (
+          <React.Fragment key={crumb.id}>
+            <Text style={[styles.breadcrumbText, { color: Colors.textTertiary }]}>/</Text>
+            <TouchableOpacity onPress={() => files.navigateTo(crumb.id)}>
+              <Text style={[styles.breadcrumbText, { color: Colors.primary }]} numberOfLines={1}>
+                {crumb.name}
               </Text>
-              <TouchableOpacity
-                onPress={() => navigateTo(node.id)}
-              >
-                <Text
-                  style={[
-                    styles.breadcrumbItem,
-                    {
-                      color:
-                        node.id === currentFolderId
-                          ? Colors.textPrimary
-                          : Colors.primary,
-                    },
-                  ]}
-                >
-                  {node.name}
-                </Text>
-              </TouchableOpacity>
-            </React.Fragment>
-          ))}
-        </View>
-      )}
+            </TouchableOpacity>
+          </React.Fragment>
+        ))}
+      </View>
 
-      {/* Create dialog */}
-      {creating && (
-        <View style={[styles.createBar, { backgroundColor: Colors.surface, borderColor: Colors.border }]}>
-          <Text style={{ fontSize: 14 }}>
-            {creating === "folder" ? "📁" : "📄"}
-          </Text>
+      {files.editingFile ? (
+        <View style={styles.editor}>
+          <View style={styles.editorHeader}>
+            <TouchableOpacity onPress={files.closeEditor} style={[styles.textBtn, { borderColor: Colors.border }]}>
+              <Text style={[styles.textBtnLabel, { color: Colors.textSecondary }]}>关闭</Text>
+            </TouchableOpacity>
+            <Text style={[styles.editorTitle, { color: Colors.textPrimary }]} numberOfLines={1}>
+              {files.editingFile.name}
+            </Text>
+            <TouchableOpacity onPress={files.saveFile} style={[styles.textBtn, { borderColor: Colors.primary, backgroundColor: Colors.primary }]}>
+              <Text style={[styles.textBtnLabel, { color: Colors.textOnPrimary }]}>保存</Text>
+            </TouchableOpacity>
+          </View>
           <TextInput
-            style={[styles.createInput, { color: Colors.textPrimary, borderColor: Colors.border }]}
-            value={newName}
-            onChangeText={setNewName}
-            placeholder={creating === "folder" ? "文件夹名称" : "文件名称"}
+            style={[styles.editorInput, { color: Colors.textPrimary, backgroundColor: Colors.surface, borderColor: Colors.border }]}
+            value={files.editContent}
+            onChangeText={files.updateEditContent}
+            multiline
+            textAlignVertical="top"
+            placeholder="写点什么..."
             placeholderTextColor={Colors.textTertiary}
-            autoFocus
-            onSubmitEditing={confirmCreate}
-            returnKeyType="done"
           />
-          <TouchableOpacity onPress={confirmCreate} style={[styles.createConfirm, { backgroundColor: Colors.primary }]}>
-            <Text style={{ color: Colors.textOnPrimary, fontSize: FontSize.sm, fontWeight: "600" }}>
-              确定
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setCreating(null)}
-            style={{ paddingLeft: Spacing.sm }}
-          >
-            <Text style={{ color: Colors.textTertiary, fontSize: FontSize.sm }}>
-              取消
-            </Text>
-          </TouchableOpacity>
         </View>
-      )}
-
-      {/* File list */}
-      {loading ? (
-        <View style={styles.emptyState}>
+      ) : files.loading ? (
+        <View style={styles.loadingWrap}>
           <ActivityIndicator color={Colors.primary} />
-        </View>
-      ) : nodes.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={{ color: Colors.textTertiary, fontSize: FontSize.md }}>
-            空文件夹
-          </Text>
-          <Text style={{ color: Colors.textTertiary, fontSize: FontSize.sm, marginTop: Spacing.xs }}>
-            点击右上角按钮创建文件或文件夹
-          </Text>
         </View>
       ) : (
         <FlatList
-          data={nodes}
-          keyExtractor={(item) => item.id}
+          data={files.nodes}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingVertical: Spacing.sm }}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={files.nodes.length === 0 ? styles.emptyList : styles.listContent}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: Colors.textTertiary }]}>这里还没有文件</Text>
+          }
         />
       )}
-    </View>
+
+      <Modal transparent visible={files.creating !== null} animationType="fade" onRequestClose={files.cancelCreate}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalContent, { backgroundColor: Colors.surface, borderColor: Colors.border }]}>
+            <Text style={[styles.modalTitle, { color: Colors.textPrimary }]}>
+              新建{files.creating === "folder" ? "文件夹" : "文件"}
+            </Text>
+            <TextInput
+              style={[styles.modalInput, { color: Colors.textPrimary, borderColor: Colors.border }]}
+              value={files.newName}
+              onChangeText={files.setNewName}
+              autoFocus
+              placeholder="名称"
+              placeholderTextColor={Colors.textTertiary}
+              onSubmitEditing={files.confirmCreate}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={files.cancelCreate} style={[styles.textBtn, { borderColor: Colors.border }]}>
+                <Text style={[styles.textBtnLabel, { color: Colors.textSecondary }]}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={files.confirmCreate} style={[styles.textBtn, { borderColor: Colors.primary, backgroundColor: Colors.primary }]}>
+                <Text style={[styles.textBtnLabel, { color: Colors.textOnPrimary }]}>创建</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -441,125 +195,160 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.md,
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
-    gap: Spacing.sm,
   },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: Radius.full,
-  },
-  headerTitleWrap: {
+  headerText: {
     flex: 1,
   },
   kicker: {
     fontSize: FontSize.xs,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    marginBottom: 1,
+    fontWeight: "700",
+    letterSpacing: 0,
   },
-  headerTitle: {
-    fontSize: FontSize.xl,
+  title: {
+    fontSize: FontSize.title,
     fontWeight: "800",
   },
   headerActions: {
     flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  breadcrumbs: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
   },
-  saveBtn: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.md,
-  },
-  saveBtnText: {
+  breadcrumbText: {
     fontSize: FontSize.sm,
     fontWeight: "700",
   },
-  breadcrumb: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderBottomWidth: 1,
-  },
-  breadcrumbItem: {
-    fontSize: FontSize.sm,
-    fontWeight: "500",
-  },
-  createBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    gap: Spacing.xs,
-  },
-  createInput: {
-    flex: 1,
-    fontSize: FontSize.md,
-    paddingVertical: Spacing.xs,
-    borderWidth: 0,
-  },
-  createConfirm: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-  },
-  itemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: Spacing.md,
-    marginVertical: Spacing.xs / 2,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderWidth: 1,
-    borderRadius: Radius.md,
+  listContent: {
+    padding: Spacing.md,
     gap: Spacing.sm,
   },
-  itemIcon: {
-    fontSize: 20,
+  emptyList: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.xl,
   },
-  itemInfo: {
+  emptyText: {
+    fontSize: FontSize.md,
+    fontWeight: "600",
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemRow: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    ...Shadows.sm,
+  },
+  itemTextWrap: {
     flex: 1,
   },
   itemName: {
     fontSize: FontSize.md,
+    fontWeight: "700",
+  },
+  itemMeta: {
+    marginTop: 2,
+    fontSize: FontSize.xs,
     fontWeight: "600",
   },
   itemNameInput: {
     flex: 1,
-    fontSize: FontSize.md,
-    fontWeight: "600",
+    minHeight: 38,
     borderWidth: 1,
     borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-  },
-  itemMeta: {
-    fontSize: FontSize.xs,
-    marginTop: 2,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    fontSize: FontSize.md,
+    fontWeight: "700",
   },
   editor: {
     flex: 1,
+    padding: Spacing.md,
+  },
+  editorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  editorTitle: {
+    flex: 1,
+    fontSize: FontSize.md,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  editorInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
     fontSize: FontSize.md,
     lineHeight: 22,
-    padding: Spacing.md,
-    margin: Spacing.md,
+  },
+  textBtn: {
+    minHeight: 36,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+  },
+  textBtnLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: "800",
+  },
+  modalBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    padding: Spacing.lg,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 420,
+    borderWidth: 1,
     borderRadius: Radius.lg,
-    borderWidth: 0,
-    textAlignVertical: "top",
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: "800",
+  },
+  modalInput: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    fontSize: FontSize.md,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: Spacing.sm,
   },
 });

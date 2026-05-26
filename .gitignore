@@ -3,6 +3,8 @@ node_modules/
 dist/
 web-build/
 build_log*.txt
+.tmp-*.log
+*.apk
 *.jks
 *.p8
 *.p12
