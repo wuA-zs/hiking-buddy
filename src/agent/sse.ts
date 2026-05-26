@@ -1,4 +1,3 @@
-import { normalizeAGenUIContent } from "./agenui-content";
 import type { ChatChunk } from "./openai-types";
 import type { AssistantMessage } from "./types";
 
@@ -61,7 +60,6 @@ export function parseSSEText(text: string, message: AssistantMessage): void {
     }
   }
 
-  normalizeAGenUIContent(message);
   for (const [, buf] of toolCallBuffers) {
     let args: Record<string, unknown> = {};
     try {

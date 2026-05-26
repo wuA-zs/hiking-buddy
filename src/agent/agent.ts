@@ -19,8 +19,6 @@ import type {
 } from "./types";
 import { generateId } from "./types";
 import { formatSkillsForSystemPrompt } from "./skills";
-import { formatAGenUIClientCapabilitiesForPrompt } from "../agenui/capabilities";
-import { normalizeAGenUIContent } from "./agenui-content";
 import type { ChatChunk } from "./openai-types";
 import { parseSSEText } from "./sse";
 import { runAgentTool } from "./tool-runner";
@@ -164,7 +162,6 @@ export class Agent {
       const content = json.choices?.[0]?.message?.content;
       if (content) {
         message.content = [{ type: "text", text: content }];
-        normalizeAGenUIContent(message);
       }
       const finishReason = json.choices?.[0]?.finish_reason;
       if (finishReason === "tool_calls") {
@@ -192,7 +189,6 @@ export class Agent {
           outputTokens: json.usage.completion_tokens ?? 0,
         };
       }
-      normalizeAGenUIContent(message);
     } catch {
       message.stopReason = "error";
       message.content = [{ type: "text", text: `瑙ｆ瀽鍝嶅簲澶辫触: ${text.slice(0, 200)}` }];
@@ -344,7 +340,6 @@ export class Agent {
       }
 
       // Finalize tool calls
-      normalizeAGenUIContent(message);
       for (const [, buf] of toolCallBuffers) {
         let args: Record<string, unknown> = {};
         try {
@@ -428,8 +423,7 @@ export class Agent {
           .filter((c) => c.type === "text")
           .map((c) => c.text)
           .join("");
-        const hasAGenUI = msg.content.some((c) => c.type === "agenui");
-        const content: string | null = textContent || (hasAGenUI ? "[AGenUI content rendered]" : null);
+        const content: string | null = textContent || null;
 
         const toolCalls = msg.content
           .filter((c) => c.type === "toolCall")
@@ -486,14 +480,11 @@ export class Agent {
 
   private buildSystemPrompt(basePrompt: string, skills: Skill[]): string {
     const skillSection = formatSkillsForSystemPrompt(skills);
-    const agenUISection = skills.some((skill) => skill.name === "a2ui-generation")
-      ? `\n\n${formatAGenUIClientCapabilitiesForPrompt()}`
-      : "";
     const date = new Date().toLocaleDateString("zh-CN", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     });
-    return `${basePrompt}\n\n${skillSection}${agenUISection}\n\n当前日期: ${date}`;
+    return `${basePrompt}\n\n${skillSection}\n\n当前日期: ${date}`;
   }
 }

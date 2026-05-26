@@ -1,7 +1,0 @@
-{
-  "platforms": ["android"],
-  "ios": {},
-  "android": {
-    "modules": ["expo.modules.agenui.AGenUIModule"]
-  }
-}

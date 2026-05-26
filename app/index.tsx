@@ -38,18 +38,17 @@ export default function ChatScreen() {
     handlePhoto,
     handleLocationTap,
     handlePOITap,
-    handleAGenUIAction,
   } = useChatAgent();
 
   const renderItem = useCallback(
-    ({ item }: { item: AgentMessage }) => <ChatBubble message={item} onAGenUIAction={handleAGenUIAction} />,
-    [handleAGenUIAction],
+    ({ item }: { item: AgentMessage }) => <ChatBubble message={item} />,
+    [],
   );
 
   const streamFooter = useCallback(() => {
     if (!streamingMessage) return null;
-    return <StreamingText message={streamingMessage} onAGenUIAction={handleAGenUIAction} />;
-  }, [handleAGenUIAction, streamingMessage]);
+    return <StreamingText message={streamingMessage} />;
+  }, [streamingMessage]);
 
   return (
     <ErrorBoundary>

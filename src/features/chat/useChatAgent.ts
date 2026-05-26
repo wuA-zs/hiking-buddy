@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
-import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import type { AGenUIAction, AGenUIActionEvent } from "expo-agenui";
 import { Agent } from "../../agent/agent";
 import { generateId } from "../../agent/types";
 import type { AgentEvent, AgentMessage, AssistantMessage, Skill, UserMessage } from "../../agent/types";
@@ -239,28 +237,6 @@ export function useChatAgent() {
     }
   }, []);
 
-  const handleAGenUIAction = useCallback(async (event: AGenUIActionEvent) => {
-    const action = event.action ?? parseAGenUIAction(event.rawEvent);
-    const openUrl = action?.functionCall?.call === "openUrl"
-      ? action.functionCall.args?.url
-      : undefined;
-
-    if (typeof openUrl === "string") {
-      await Linking.openURL(openUrl);
-      return;
-    }
-
-    if (!agentRef.current) return;
-    const actionText = action ? JSON.stringify(action) : event.rawEvent;
-    try {
-      await agentRef.current.prompt(
-        `用户点击了 AGenUI 卡片中的交互项。surfaceId=${event.surfaceId ?? ""} componentId=${event.componentId ?? ""} action=${actionText}。请根据这个交互继续执行，必要时调用工具。`,
-      );
-    } catch {
-      // Keep card interaction quiet if the agent is busy.
-    }
-  }, []);
-
   function appendAssistantError(text: string) {
     const errMsg: AssistantMessage = {
       id: generateId(),
@@ -286,21 +262,5 @@ export function useChatAgent() {
     handlePhoto,
     handleLocationTap,
     handlePOITap,
-    handleAGenUIAction,
   };
-}
-
-function parseAGenUIAction(rawEvent: string): AGenUIAction | undefined {
-  try {
-    const parsed = JSON.parse(rawEvent);
-    if (parsed.action && typeof parsed.action === "object") {
-      return parsed.action as AGenUIAction;
-    }
-    if (parsed.functionCall || parsed.event) {
-      return parsed as AGenUIAction;
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
 }

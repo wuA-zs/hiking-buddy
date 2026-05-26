@@ -1,17 +1,14 @@
 import React from "react";
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, ToastAndroid, View } from "react-native";
 import type { AgentMessage } from "../agent/types";
-import { copyTextToClipboard, type AGenUIActionEvent } from "expo-agenui";
 import { useTheme, Spacing, FontSize, Radius, formatTime } from "../lib/theme";
 import { AssistantBubble } from "./AssistantBubble";
-import { AGenUIBubble } from "./AGenUIBubble";
 
 interface Props {
   message: AgentMessage;
-  onAGenUIAction?: (event: AGenUIActionEvent) => void;
 }
 
-export function ChatBubble({ message, onAGenUIAction }: Props) {
+export function ChatBubble({ message }: Props) {
   const { colors: Colors } = useTheme();
   const copyText = getCopyText(message);
 
@@ -73,9 +70,6 @@ export function ChatBubble({ message, onAGenUIAction }: Props) {
                 </Text>
               ) : null;
             }
-            if (content.type === "agenui") {
-              return <AGenUIBubble key={content.id} content={content} onAction={onAGenUIAction} />;
-            }
             return null;
           })}
         </AssistantBubble>
@@ -107,7 +101,6 @@ function getCopyText(message: AgentMessage): string {
     return message.content
       .map((content) => {
         if (content.type === "text") return content.text;
-        if (content.type === "agenui") return `AGenUI payload:\n${content.payload}`;
         if (content.type === "toolCall") return `[tool:${content.name}] ${JSON.stringify(content.arguments)}`;
         return "";
       })
@@ -116,6 +109,18 @@ function getCopyText(message: AgentMessage): string {
   }
 
   return message.content.map((content) => content.text).join("\n");
+}
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (Platform.OS !== "web") return false;
+  const clipboard = globalThis.navigator?.clipboard;
+  if (!clipboard) return false;
+  try {
+    await clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function formatDisplayText(text: string): string {

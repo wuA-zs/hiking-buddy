@@ -4,7 +4,7 @@
 
 **Goal:** Make the project structure easier to maintain by cleaning generated artifacts, splitting oversized runtime/page files, and introducing feature-oriented boundaries.
 
-**Architecture:** Keep Expo Router pages as route shells. Move chat and file-browser behavior into feature modules. Keep `src/agent/Agent` as the public facade while extracting transport, streaming, tool execution, and AGenUI parsing helpers.
+**Architecture:** Keep Expo Router pages as route shells. Move chat and file-browser behavior into feature modules. Keep `src/agent/Agent` as the public facade while extracting transport, streaming, and tool execution helpers.
 
 **Tech Stack:** Expo Router, React Native, TypeScript, local Expo modules.
 
@@ -22,13 +22,12 @@
 ### Task 2: Agent Runtime Decomposition
 
 **Files:**
-- Create: `src/agent/agenui-content.ts`
 - Create: `src/agent/openai-types.ts`
 - Create: `src/agent/sse.ts`
 - Create: `src/agent/tool-runner.ts`
 - Modify: `src/agent/agent.ts`
 
-**Goal:** Leave `Agent` responsible for orchestration only. Move AGenUI content extraction, SSE fallback parsing, OpenAI chunk types, and tool execution into focused modules.
+**Goal:** Leave `Agent` responsible for orchestration only. Move SSE fallback parsing, OpenAI chunk types, and tool execution into focused modules.
 
 **Verification:**
 - Existing behavior compiles unchanged.
@@ -41,7 +40,7 @@
 - Create: `src/features/chat/useChatAgent.ts`
 - Modify: `app/index.tsx`
 
-**Goal:** Keep `app/index.tsx` as a route/UI shell. Move Agent initialization, skill loading, message subscription, send/photo/location/POI/AGenUI actions into a hook.
+**Goal:** Keep `app/index.tsx` as a route/UI shell. Move Agent initialization, skill loading, message subscription, send/photo/location/POI actions into a hook.
 
 **Verification:**
 - Route imports compile.

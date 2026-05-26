@@ -1,6 +1,0 @@
-{
-  "name": "expo-agenui",
-  "version": "0.1.0",
-  "description": "Expo bridge for the native AGenUI A2UI runtime",
-  "main": "src/index.ts"
-}

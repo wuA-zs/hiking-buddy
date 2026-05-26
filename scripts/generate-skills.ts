@@ -105,11 +105,11 @@ function generateIndex(skills: SkillEntry[]): string {
     "};",
   ];
 
+  lines.push("", "export const bundledSkillDocs: Record<string, string> = {");
   if (docEntries.length > 0) {
-    lines.push("", "export const bundledSkillDocs: Record<string, string> = {");
     lines.push(docEntries.join(",\n"));
-    lines.push("};");
   }
+  lines.push("};");
 
   lines.push("");
   return lines.join("\n");

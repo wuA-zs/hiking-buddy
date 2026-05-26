@@ -5,18 +5,18 @@ export function createLoadSkillTool(getSkills: () => Skill[]): AgentTool {
     name: "load_skill",
     label: "加载技能",
     description:
-      "按名称加载 skill 的完整指令内容。支持加载子文档（如 'a2ui-generation' 的 'docs/component-catalog.md'）。当用户任务匹配某个 skill 的描述时调用此工具获取详细指令。",
+      "按名称加载 skill 的完整指令内容。支持加载子文档。当用户任务匹配某个 skill 的描述时调用此工具获取详细指令。",
     parameters: {
       type: "object",
       properties: {
         name: {
           type: "string",
-          description: "要加载的 skill 名称，如 'hiking-guide'、'a2ui-generation'",
+          description: "要加载的 skill 名称，如 'hiking-guide'",
         },
         doc: {
           type: "string",
           description:
-            "可选。要加载的子文档相对路径，如 'docs/component-catalog.md'、'reference.md'。不传则返回主 SKILL.md 内容。",
+            "可选。要加载的子文档相对路径，如 'reference.md'。不传则返回主 SKILL.md 内容。",
         },
       },
       required: ["name"],
