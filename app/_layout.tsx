@@ -8,6 +8,7 @@ export default function RootLayout() {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="files" />
       <Stack.Screen name="settings" options={{ presentation: "modal" }} />
       <Stack.Screen name="agent-config" options={{ presentation: "modal" }} />
       <Stack.Screen name="skill-edit" />

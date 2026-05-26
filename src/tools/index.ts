@@ -6,6 +6,11 @@ import { searchNearbyTool } from "./search-nearby";
 import { routePlanningTool } from "./route-planning";
 import { travelPlannerTool } from "./travel-planner";
 import { createLoadSkillTool } from "./load-skill";
+import { listFilesTool } from "./list-files";
+import { readFileTool } from "./read-file";
+import { createFileTool } from "./create-file";
+import { updateFileTool } from "./update-file";
+import { deleteFileTool } from "./delete-file";
 
 export function createHikingTools(getSkills: () => Skill[]): AgentTool[] {
   return [
@@ -16,5 +21,10 @@ export function createHikingTools(getSkills: () => Skill[]): AgentTool[] {
     routePlanningTool,
     travelPlannerTool,
     createLoadSkillTool(getSkills),
+    listFilesTool,
+    readFileTool,
+    createFileTool,
+    updateFileTool,
+    deleteFileTool,
   ];
 }

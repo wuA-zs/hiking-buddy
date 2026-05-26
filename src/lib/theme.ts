@@ -145,6 +145,11 @@ export const TOOL_CALL_LABELS: Record<string, string> = {
   get_trail_info: "查询路线",
   plan_route: "规划路线",
   plan_travel: "规划行程",
+  list_files: "浏览文件",
+  read_file: "读取文件",
+  create_file: "创建文件",
+  update_file: "更新文件",
+  delete_file: "删除文件",
 };
 
 export function getToolCallLabel(name: string): string {

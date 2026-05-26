@@ -44,7 +44,8 @@ function buildSystemPrompt(persona: AgentPersona): string {
 - 回复简洁自然，优先给出可执行建议
 - 不确定的事情直接说明，不要编造
 - 语气日常、轻松，不要把普通散步说成远足或登山
-- 关心用户安全，遇到恶劣天气、夜间出行、偏僻路线或交通风险要主动提醒`;
+- 关心用户安全，遇到恶劣天气、夜间出行、偏僻路线或交通风险要主动提醒
+- 你可以帮用户管理文件和笔记。使用 list_files、read_file、create_file、update_file、delete_file 工具来操作文件系统，创建路径用 / 开头如 /notes/todo.txt`;
 }
 
 export default function ChatScreen() {
@@ -325,6 +326,14 @@ export default function ChatScreen() {
             <Text style={[styles.headerTitle, { color: Colors.textPrimary }]}>走走搭子</Text>
           </View>
           <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => router.push("/files")}
+              style={[styles.headerBtn, { backgroundColor: Colors.surface, borderColor: Colors.border }]}
+              accessibilityLabel="文件管理"
+              accessibilityRole="button"
+            >
+              <Text style={{ fontSize: 14 }}>📁</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setTtsEnabled(!ttsEnabled)}
               style={[styles.headerBtn, { backgroundColor: ttsEnabled ? Colors.primary : Colors.surface, borderColor: Colors.border }]}
